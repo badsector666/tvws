@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>TradingView WS Browser Test - tvws</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            .container {
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+            .status {
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            .success {
+                background-color: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .error {
+                background-color: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            .info {
+                background-color: #d1ecf1;
+                color: #0c5460;
+                border: 1px solid #bee5eb;
+            }
+            .warning {
+                background-color: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+            }
+            button {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin: 5px;
+            }
+            button:hover {
+                background-color: #0056b3;
+            }
+            button:disabled {
+                background-color: #6c757d;
+                cursor: not-allowed;
+            }
+            .candles-container {
+                max-height: 300px;
+                overflow-y: auto;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                padding: 10px;
+                margin: 10px 0;
+            }
+            .candle-item {
+                font-family: monospace;
+                font-size: 12px;
+                margin: 2px 0;
+                padding: 4px;
+                background: white;
+                border-radius: 2px;
+            }
+            #log {
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                padding: 10px;
+                font-family: monospace;
+                font-size: 12px;
+                max-height: 200px;
+                overflow-y: auto;
+                white-space: pre-wrap;
+            }
+            .cdn-test {
+                background-color: #e2e3e5;
+                padding: 15px;
+                border-radius: 4px;
+                margin: 10px 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>TradingView WebSocket Browser Test</h1>
+            <p><strong>Package:</strong> tvws (v0.0.3)</p>
+
+            <div class="cdn-test">
+                <h3>📦 CDN Usage Example (after npm publish)</h3>
+                <p>Once published to npm, you can use it via CDN:</p>
+                <code>
+                    &lt;script type="module"&gt;<br />
+                    &nbsp;&nbsp;import { connect, getCandles } from
+                    'https://unpkg.com/tvws@latest/dist/index.js';<br />
+                    &lt;/script&gt;
+                </code>
+            </div>
+
+            <div id="status" class="status info">
+                Ready to test TradingView WebSocket connection in browser...
+            </div>
+
+            <div>
+                <button id="connectBtn" onclick="testConnection()">
+                    Test Connection
+                </button>
+                <button id="candlesBtn" onclick="testCandles()" disabled>
+                    Get Sample Candles
+                </button>
+                <button id="clearBtn" onclick="clearLog()">Clear Log</button>
+            </div>
+
+            <div id="candlesSection" style="display: none">
+                <h3>Sample Candle Data:</h3>
+                <div id="candlesContainer" class="candles-container"></div>
+            </div>
+
+            <h3>Console Log:</h3>
+            <div id="log"></div>
+        </div>
+
+        <script type="module">
+            // Local testing - import from dist folder
+            // After npm publish, replace with:
+            // import { connect, getCandles } from 'https://unpkg.com/tvws@latest/dist/index.js';
+
+            import { connect, getCandles, ENDPOINTS } from "./dist/index.js";
+
+            let connection = null;
+
+            // Update status display
+            function updateStatus(message, type = "info") {
+                const statusEl = document.getElementById("status");
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+            }
+
+            // Log messages to both console and UI
+            function log(message, type = "info") {
+                const timestamp = new Date().toLocaleTimeString();
+                const logMessage = `[${timestamp}] ${message}`;
+                console.log(logMessage);
+
+                const logEl = document.getElementById("log");
+                logEl.textContent += logMessage + "\n";
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+
+            // Make functions globally available
+            window.testConnection = async function () {
+                const connectBtn = document.getElementById("connectBtn");
+                const candlesBtn = document.getElementById("candlesBtn");
+
+                connectBtn.disabled = true;
+                connectBtn.textContent = "Connecting...";
+                updateStatus(
+                    "Attempting to connect to TradingView WebSocket...",
+                    "info",
+                );
+
+                try {
+                    log("Starting connection test...");
+                    log("Using browser-native WebSocket API...");
+
+                    connection = await connect({
+                        // Note: sessionId will only work if CORS allows it
+                        // For testing, we'll use unauthorized token
+                    });
+
+                    log(
+                        "✅ Successfully connected to TradingView WebSocket!",
+                        "success",
+                    );
+                    updateStatus(
+                        "Connection successful! Ready to test candle data retrieval.",
+                        "success",
+                    );
+
+                    // Enable candles button
+                    candlesBtn.disabled = false;
+                    connectBtn.textContent = "Connected";
+
+                    // Subscribe to some events to see real-time data
+                    connection.subscribe((event) => {
+                        log(`Received event: ${event.name}`, "info");
+                    });
+                } catch (error) {
+                    log(`❌ Connection failed: ${error.message}`, "error");
+                    updateStatus(
+                        `Connection failed: ${error.message}`,
+                        "error",
+                    );
+                    connectBtn.disabled = false;
+                    connectBtn.textContent = "Test Connection";
+                }
+            };
+
+            window.testCandles = async function () {
+                if (!connection) {
+                    log("❌ No active connection", "error");
+                    return;
+                }
+
+                const candlesBtn = document.getElementById("candlesBtn");
+                const candlesSection =
+                    document.getElementById("candlesSection");
+                const candlesContainer =
+                    document.getElementById("candlesContainer");
+
+                candlesBtn.disabled = true;
+                candlesBtn.textContent = "Loading...";
+                updateStatus("Fetching candle data...", "info");
+
+                try {
+                    log("Fetching candle data for EUR/USD...");
+
+                    const candles = await getCandles({
+                        connection,
+                        symbols: ["FX:EURUSD"],
+                        amount: 5, // Get just 5 candles for testing
+                        timeframe: "1D", // Daily timeframe
+                    });
+
+                    log(
+                        `✅ Successfully retrieved ${candles.length} symbol(s) data`,
+                        "success",
+                    );
+
+                    if (candles.length > 0 && candles[0].length > 0) {
+                        log(
+                            `Retrieved ${candles[0].length} candles for EUR/USD`,
+                            "success",
+                        );
+
+                        // Display candle data
+                        candlesContainer.innerHTML = "";
+                        candles[0].forEach((candle, index) => {
+                            const candleEl = document.createElement("div");
+                            candleEl.className = "candle-item";
+                            candleEl.innerHTML = `
+                            <strong>Candle ${index + 1}:</strong>
+                            ${new Date(candle.timestamp * 1000).toLocaleDateString()} |
+                            Open: ${candle.open.toFixed(5)} |
+                            High: ${candle.high.toFixed(5)} |
+                            Low: ${candle.low.toFixed(5)} |
+                            Close: ${candle.close.toFixed(5)} |
+                            Volume: ${candle.volume}
+                        `;
+                            candlesContainer.appendChild(candleEl);
+                        });
+
+                        candlesSection.style.display = "block";
+                        updateStatus(
+                            "Candle data retrieved successfully!",
+                            "success",
+                        );
+                    } else {
+                        log("⚠️ No candle data received", "warning");
+                        updateStatus(
+                            "No candle data available for this symbol.",
+                            "warning",
+                        );
+                    }
+                } catch (error) {
+                    log(`❌ Failed to get candles: ${error.message}`, "error");
+                    updateStatus(
+                        `Failed to get candles: ${error.message}`,
+                        "error",
+                    );
+                } finally {
+                    candlesBtn.disabled = false;
+                    candlesBtn.textContent = "Get Sample Candles";
+                }
+            };
+
+            window.clearLog = function () {
+                document.getElementById("log").textContent = "";
+            };
+
+            // Initial log message
+            log("TradingView WebSocket Browser Test loaded successfully");
+            log(
+                "Note: This test uses the compiled dist/index.js module directly",
+            );
+            log(
+                "Browser compatibility features: Native WebSocket, Fetch API, ES2015 modules",
+            );
+
+            // Update page title with version info
+            document.title += " (v0.0.3 - Browser Compatible)";
+        </script>
+    </body>
+</html>

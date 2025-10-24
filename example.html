@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>TradingView WebSocket Example - tvws</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            .container {
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+            .status {
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            .success {
+                background-color: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .error {
+                background-color: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            .info {
+                background-color: #d1ecf1;
+                color: #0c5460;
+                border: 1px solid #bee5eb;
+            }
+            .warning {
+                background-color: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+            }
+            button {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin: 5px;
+            }
+            button:hover {
+                background-color: #0056b3;
+            }
+            button:disabled {
+                background-color: #6c757d;
+                cursor: not-allowed;
+            }
+            .results {
+                margin-top: 20px;
+                padding: 15px;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+            }
+            .candle-item {
+                font-family: monospace;
+                font-size: 14px;
+                margin: 5px 0;
+                padding: 8px;
+                background: white;
+                border-radius: 4px;
+                border-left: 4px solid #007bff;
+            }
+            #log {
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                padding: 10px;
+                font-family: monospace;
+                font-size: 12px;
+                max-height: 200px;
+                overflow-y: auto;
+                white-space: pre-wrap;
+            }
+            .endpoint-selector {
+                margin: 15px 0;
+                padding: 10px;
+                background-color: #e9ecef;
+                border-radius: 4px;
+            }
+            .endpoint-selector select {
+                padding: 5px;
+                margin: 0 10px;
+                border-radius: 4px;
+                border: 1px solid #ced4da;
+            }
+            .auth-section {
+                margin: 15px 0;
+                padding: 15px;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+            }
+            .auth-toggle {
+                margin-bottom: 10px;
+            }
+            .auth-input {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin: 10px 0;
+            }
+            .auth-status {
+                font-size: 14px;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>TradingView WebSocket Example - tvws</h1>
+            <p><strong>Package:</strong> tvws (Browser Compatible Version)</p>
+
+            <div class="endpoint-selector">
+                <label for="endpointSelect">WebSocket Endpoint:</label>
+                <select
+                    id="endpointSelect"
+                    onchange="log('Selected endpoint: ' + this.value, 'info')"
+                >
+                    <option value="data">
+                        data (Free Users - Recommended)
+                    </option>
+                    <option value="prodata">prodata (Premium Users)</option>
+                    <option value="widgetdata">widgetdata (Widget Data)</option>
+                    <option value="charts-polygon">
+                        charts-polygon (Polygon Data)
+                    </option>
+                </select>
+            </div>
+
+            <div class="auth-section">
+                <h3>🔐 Authentication (Optional)</h3>
+                <div class="auth-toggle">
+                    <label>
+                        <input
+                            type="checkbox"
+                            id="authToggle"
+                            onchange="toggleAuthFields()"
+                        />
+                        Use Authentication (Session ID)
+                    </label>
+                </div>
+                <div id="authFields" style="display: none">
+                    <div class="auth-input">
+                        <label for="sessionId">Session ID:</label>
+                        <input
+                            type="text"
+                            id="sessionId"
+                            placeholder="Enter your TradingView session ID"
+                            style="
+                                width: 300px;
+                                padding: 5px;
+                                margin: 5px;
+                                border-radius: 4px;
+                                border: 1px solid #ced4da;
+                            "
+                        />
+                        <button
+                            onclick="showSessionHelp()"
+                            style="padding: 5px 10px; font-size: 12px"
+                        >
+                            ?
+                        </button>
+                    </div>
+                    <div
+                        class="auth-status"
+                        id="authStatus"
+                        style="
+                            margin: 10px 0;
+                            padding: 8px;
+                            border-radius: 4px;
+                            display: none;
+                        "
+                    >
+                        <!-- Auth status will be displayed here -->
+                    </div>
+                </div>
+                <div
+                    id="sessionHelp"
+                    style="
+                        display: none;
+                        margin: 10px 0;
+                        padding: 10px;
+                        background-color: #f8f9fa;
+                        border-radius: 4px;
+                        border: 1px solid #dee2e6;
+                    "
+                >
+                    <h4>📋 How to Find Your Session ID:</h4>
+                    <ol>
+                        <li>
+                            Log into TradingView (<a
+                                href="https://www.tradingview.com"
+                                target="_blank"
+                                >www.tradingview.com</a
+                            >)
+                        </li>
+                        <li>Open browser developer tools (F12)</li>
+                        <li>
+                            Go to <strong>Application</strong> tab →
+                            <strong>Cookies</strong> →
+                            <strong>https://www.tradingview.com</strong>
+                        </li>
+                        <li>Find the cookie named <code>sessionid</code></li>
+                        <li>
+                            Copy the value (it's a long alphanumeric string)
+                        </li>
+                    </ol>
+                    <p>
+                        <strong>Note:</strong> Due to browser CORS restrictions,
+                        authentication may not work in all browsers. If it
+                        fails, the system will automatically fall back to
+                        unauthorized access.
+                    </p>
+                    <button
+                        onclick="hideSessionHelp()"
+                        style="
+                            padding: 5px 10px;
+                            font-size: 12px;
+                            margin-top: 10px;
+                        "
+                    >
+                        Hide Help
+                    </button>
+                </div>
+            </div>
+
+            <div id="status" class="status info">
+                Ready to test TradingView WebSocket connection...
+            </div>
+
+            <div>
+                <button id="connectBtn" onclick="testConnection()">
+                    Connect to TradingView
+                </button>
+                <button id="candlesBtn" onclick="loadData()" disabled>
+                    Get EUR/USD Data
+                </button>
+                <button id="clearBtn" onclick="clearResults()">
+                    Clear Results
+                </button>
+                <button id="clearLogBtn" onclick="clearLog()">Clear Log</button>
+            </div>
+
+            <div id="results" class="results" style="display: none">
+                <h3>EUR/USD Candle Data (Daily)</h3>
+                <div id="candleData"></div>
+            </div>
+
+            <h3>Debug Log:</h3>
+            <div id="log"></div>
+        </div>
+
+        <script type="module">
+            // Use CDN for easy testing - works in any browser
+            import {
+                connect,
+                getCandles,
+                ENDPOINTS,
+            } from "https://unpkg.com/tvws@latest/dist/index.js";
+
+            let connection = null;
+
+            // Authentication helper functions
+            window.toggleAuthFields = function () {
+                const authToggle = document.getElementById("authToggle");
+                const authFields = document.getElementById("authFields");
+
+                if (authToggle.checked) {
+                    authFields.style.display = "block";
+                    log(
+                        "Authentication enabled - please enter your session ID",
+                        "info",
+                    );
+                } else {
+                    authFields.style.display = "none";
+                    hideAuthStatus();
+                    log(
+                        "Authentication disabled - will use unauthorized access",
+                        "info",
+                    );
+                }
+            };
+
+            window.showSessionHelp = function () {
+                document.getElementById("sessionHelp").style.display = "block";
+            };
+
+            window.hideSessionHelp = function () {
+                document.getElementById("sessionHelp").style.display = "none";
+            };
+
+            function showAuthStatus(message, type) {
+                const authStatus = document.getElementById("authStatus");
+                authStatus.textContent = message;
+                authStatus.className = `auth-status status ${type}`;
+                authStatus.style.display = "block";
+            }
+
+            function hideAuthStatus() {
+                document.getElementById("authStatus").style.display = "none";
+            }
+
+            function getAuthOptions() {
+                const authToggle = document.getElementById("authToggle");
+                const sessionId = document
+                    .getElementById("sessionId")
+                    .value.trim();
+
+                if (authToggle.checked && sessionId) {
+                    return { sessionId: sessionId };
+                }
+                return {};
+            }
+
+            // Make functions globally available
+            window.testConnection = async function () {
+                const connectBtn = document.getElementById("connectBtn");
+                const candlesBtn = document.getElementById("candlesBtn");
+                const selectedEndpoint =
+                    document.getElementById("endpointSelect").value;
+                const authOptions = getAuthOptions();
+
+                connectBtn.disabled = true;
+                connectBtn.textContent = "Connecting...";
+                updateStatus(
+                    `Connecting to ${selectedEndpoint} endpoint...`,
+                    "info",
+                );
+
+                log("=== Connection Test Started ===", "info");
+                log(`Endpoint: ${selectedEndpoint}`);
+                log(`WebSocket URL: ${ENDPOINTS[selectedEndpoint]}`);
+
+                try {
+                    connection = await connect({
+                        endpoint: selectedEndpoint,
+                    });
+
+                    log("✅ WebSocket connection established!", "success");
+
+                    if (authOptions.sessionId) {
+                        showAuthStatus(
+                            "✅ Authentication successful!",
+                            "success",
+                        );
+                        log(
+                            "🎉 Authentication successful - premium data may be available",
+                            "success",
+                        );
+                    } else {
+                        showAuthStatus(
+                            "✅ Connected with unauthorized access",
+                            "warning",
+                        );
+                        log(
+                            "⚠️ Connected without authentication - using public data",
+                            "warning",
+                        );
+                    }
+
+                    updateStatus(
+                        "Connected successfully! Ready to fetch data.",
+                        "success",
+                    );
+
+                    // Enable data button
+                    candlesBtn.disabled = false;
+                    connectBtn.textContent = "Connected";
+
+                    // Subscribe to real-time events
+                    connection.subscribe((event) => {
+                        log(`📡 Real-time event: ${event.name}`, "info");
+                    });
+                } catch (error) {
+                    log(`❌ Connection failed: ${error.message}`, "error");
+
+                    if (authOptions.sessionId) {
+                        log(
+                            "🔐 Authentication failed - possible reasons:",
+                            "warning",
+                        );
+                        log("- Session ID expired or invalid", "warning");
+                        log(
+                            "- CORS restrictions blocked authentication",
+                            "warning",
+                        );
+                        log("- Browser security policies", "warning");
+                        log(
+                            "Try again without authentication or refresh your session ID",
+                            "info",
+                        );
+                        showAuthStatus(
+                            "❌ Authentication failed - try without auth or check session ID",
+                            "error",
+                        );
+                    } else {
+                        log("Connection failed - possible reasons:", "warning");
+                        log("- Network connectivity issues", "warning");
+                        log(
+                            "- WebSocket blocked by browser/security policy",
+                            "warning",
+                        );
+                        log(
+                            "- TradingView endpoint temporarily unavailable",
+                            "warning",
+                        );
+                        log(
+                            "Solution: Try a different endpoint or check your internet connection",
+                            "info",
+                        );
+                    }
+
+                    updateStatus(
+                        `Connection failed: ${error.message}`,
+                        "error",
+                    );
+                    connectBtn.disabled = false;
+                    connectBtn.textContent = "Connect to TradingView";
+                }
+            };
+
+            window.loadData = async function () {
+                if (!connection) {
+                    log(
+                        "❌ No active connection. Please connect first.",
+                        "error",
+                    );
+                    return;
+                }
+
+                const candlesBtn = document.getElementById("candlesBtn");
+                const resultsDiv = document.getElementById("results");
+                const candleDataDiv = document.getElementById("candleData");
+
+                candlesBtn.disabled = true;
+                candlesBtn.textContent = "Loading...";
+                updateStatus("Fetching EUR/USD candle data...", "info");
+
+                log("=== Data Fetch Started ===", "info");
+                log("Symbol: FX:EURUSD");
+                log("Timeframe: 1D (Daily)");
+                log("Amount: 10 candles");
+
+                try {
+                    const candles = await getCandles({
+                        connection,
+                        symbols: ["FX:EURUSD"],
+                        amount: 10,
+                        timeframe: "1D",
+                    });
+
+                    if (candles.length > 0 && candles[0].length > 0) {
+                        log(
+                            `✅ Successfully retrieved ${candles[0].length} candles`,
+                            "success",
+                        );
+
+                        // Display candle data
+                        candleDataDiv.innerHTML = "";
+                        candles[0].forEach((candle, index) => {
+                            const date = new Date(candle.timestamp * 1000);
+                            const candleEl = document.createElement("div");
+                            candleEl.className = "candle-item";
+                            candleEl.innerHTML = `
+                            <strong>Candle ${index + 1}:</strong> ${date.toLocaleDateString()} |
+                            Open: ${candle.open.toFixed(5)} |
+                            High: ${candle.high.toFixed(5)} |
+                            Low: ${candle.low.toFixed(5)} |
+                            Close: ${candle.close.toFixed(5)} |
+                            Volume: ${candle.volume}
+                        `;
+                            candleDataDiv.appendChild(candleEl);
+                        });
+
+                        resultsDiv.style.display = "block";
+                        updateStatus("Data loaded successfully!", "success");
+                        log("✅ Data displayed in results section", "success");
+                    } else {
+                        log(
+                            "⚠️ No data received - possible reasons:",
+                            "warning",
+                        );
+                        log(
+                            "- Symbol not available on this endpoint",
+                            "warning",
+                        );
+                        log(
+                            "- Insufficient data for requested timeframe",
+                            "warning",
+                        );
+                        log("- Try a different symbol or endpoint", "info");
+                        updateStatus(
+                            "No data available for this symbol.",
+                            "warning",
+                        );
+                    }
+                } catch (error) {
+                    log(`❌ Data fetch failed: ${error.message}`, "error");
+                    updateStatus(
+                        `Failed to fetch data: ${error.message}`,
+                        "error",
+                    );
+                } finally {
+                    candlesBtn.disabled = false;
+                    candlesBtn.textContent = "Get EUR/USD Data";
+                    log("=== Data Fetch Completed ===", "info");
+                }
+            };
+
+            window.clearResults = function () {
+                document.getElementById("results").style.display = "none";
+                document.getElementById("candleData").innerHTML = "";
+                updateStatus("Results cleared.", "info");
+                log("Results cleared", "info");
+            };
+
+            window.clearLog = function () {
+                document.getElementById("log").textContent = "";
+            };
+
+            function updateStatus(message, type = "info") {
+                const statusEl = document.getElementById("status");
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+            }
+
+            function log(message, type = "info") {
+                const timestamp = new Date().toLocaleTimeString();
+                const logMessage = `[${timestamp}] ${message}`;
+                console.log(logMessage);
+
+                const logEl = document.getElementById("log");
+                logEl.textContent += logMessage + "\n";
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+
+            // Initialize
+            log("TradingView WebSocket Example loaded", "success");
+            log("Package: tvws (Browser Compatible)", "info");
+            log(
+                "Imported from: https://unpkg.com/tvws@latest/dist/index.js",
+                "info",
+            );
+            log("Ready to connect!", "success");
+            log("", "info");
+            log("=== Instructions ===", "info");
+            log("1. Select a WebSocket endpoint (recommended: data)", "info");
+            log(
+                "2. Optional: Enable authentication and enter your session ID",
+                "info",
+            );
+            log('3. Click "Connect to TradingView"', "info");
+            log('4. Click "Get EUR/USD Data" once connected', "info");
+            log("", "info");
+            log("💡 Authentication Tips:", "info");
+            log("- Authentication provides access to premium data", "info");
+            log(
+                "- Due to CORS restrictions, auth may not work in all browsers",
+                "info",
+            );
+            log("- If auth fails, try again without authentication", "info");
+            log("", "info");
+        </script>
+    </body>
+</html>
