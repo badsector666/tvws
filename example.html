@@ -388,7 +388,16 @@
                         log(`📡 Real-time event: ${event.name}`, "info");
                     });
                 } catch (error) {
-                    log(`❌ Connection failed: ${error.message}`, "error");
+                    // Extract proper error message
+                    const errorMessage =
+                        error?.message ||
+                        error?.toString() ||
+                        "Unknown error occurred";
+                    log(`❌ Connection failed: ${errorMessage}`, "error");
+                    log(
+                        `Error details: ${JSON.stringify(error, null, 2)}`,
+                        "info",
+                    );
 
                     if (authOptions.sessionId) {
                         log(
@@ -511,9 +520,13 @@
                         );
                     }
                 } catch (error) {
-                    log(`❌ Data fetch failed: ${error.message}`, "error");
+                    const errorMessage =
+                        error?.message ||
+                        error?.toString() ||
+                        "Unknown error occurred";
+                    log(`❌ Data fetch failed: ${errorMessage}`, "error");
                     updateStatus(
-                        `Failed to fetch data: ${error.message}`,
+                        `Failed to fetch data: ${errorMessage}`,
                         "error",
                     );
                 } finally {
