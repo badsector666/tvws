@@ -245,6 +245,13 @@
             </div>
 
             <div>
+                <button
+                    id="quickConnectBtn"
+                    onclick="quickConnect()"
+                    style="background-color: #28a745; margin-right: 10px"
+                >
+                    🚀 Quick Connect (No Auth)
+                </button>
                 <button id="connectBtn" onclick="testConnection()">
                     Connect to TradingView
                 </button>
@@ -327,6 +334,96 @@
                 }
                 return {};
             }
+
+            // Quick Connect function - bypasses all options and uses most reliable settings
+            window.quickConnect = async function () {
+                const quickConnectBtn =
+                    document.getElementById("quickConnectBtn");
+                const connectBtn = document.getElementById("connectBtn");
+                const candlesBtn = document.getElementById("candlesBtn");
+
+                quickConnectBtn.disabled = true;
+                quickConnectBtn.textContent = "Quick Connecting...";
+                connectBtn.disabled = true;
+
+                updateStatus(
+                    "Quick connecting to most reliable endpoint...",
+                    "info",
+                );
+
+                log("=== Quick Connect Started ===", "info");
+                log("Using: data endpoint (most reliable)", "info");
+                log("Authentication: DISABLED", "info");
+                log(
+                    "WebSocket URL: https://data.tradingview.com/socket.io/websocket",
+                    "info",
+                );
+
+                try {
+                    connection = await connect({
+                        endpoint: "data",
+                        // No authentication - use unauthorized access
+                    });
+
+                    log("✅ Quick connection successful!", "success");
+                    log(
+                        "🎉 Connected to TradingView - Ready to fetch data",
+                        "success",
+                    );
+                    showAuthStatus(
+                        "✅ Quick Connect successful - using public data",
+                        "success",
+                    );
+
+                    updateStatus(
+                        "Quick Connect successful! Ready to fetch data.",
+                        "success",
+                    );
+
+                    // Enable data button
+                    candlesBtn.disabled = false;
+                    quickConnectBtn.textContent = "✅ Quick Connected";
+                    connectBtn.textContent = "Connected";
+
+                    // Subscribe to real-time events
+                    connection.subscribe((event) => {
+                        log(`📡 Real-time event: ${event.name}`, "info");
+                    });
+                } catch (error) {
+                    const errorMessage =
+                        error?.message ||
+                        error?.toString() ||
+                        "Unknown error occurred";
+                    log(`❌ Quick Connect failed: ${errorMessage}`, "error");
+                    log(
+                        `Error details: ${JSON.stringify(error, null, 2)}`,
+                        "info",
+                    );
+
+                    log("Quick Connect troubleshooting:", "warning");
+                    log("- Check your internet connection", "warning");
+                    log(
+                        "- Try refreshing the page and trying again",
+                        "warning",
+                    );
+                    log(
+                        "- Some networks block WebSocket connections",
+                        "warning",
+                    );
+                    log(
+                        "- TradingView may be temporarily unavailable",
+                        "warning",
+                    );
+
+                    updateStatus(
+                        `Quick Connect failed: ${errorMessage}`,
+                        "error",
+                    );
+                    quickConnectBtn.disabled = false;
+                    quickConnectBtn.textContent = "🚀 Quick Connect (No Auth)";
+                    connectBtn.disabled = false;
+                }
+            };
 
             // Make functions globally available
             window.testConnection = async function () {
@@ -573,6 +670,14 @@
             log("Ready to connect!", "success");
             log("", "info");
             log("=== Instructions ===", "info");
+            log("🚀 QUICK START:", "info");
+            log(
+                '1. Click "🚀 Quick Connect (No Auth)" - bypasses all settings',
+                "info",
+            );
+            log('2. Click "Get EUR/USD Data" once connected', "info");
+            log("", "info");
+            log("=== Advanced Options ===", "info");
             log("1. Select a WebSocket endpoint (recommended: data)", "info");
             log(
                 "2. Optional: Enable authentication and enter your session ID",
@@ -581,13 +686,17 @@
             log('3. Click "Connect to TradingView"', "info");
             log('4. Click "Get EUR/USD Data" once connected', "info");
             log("", "info");
-            log("💡 Authentication Tips:", "info");
-            log("- Authentication provides access to premium data", "info");
+            log("💡 Tips:", "info");
+            log("- Use Quick Connect for fastest connection testing", "info");
             log(
-                "- Due to CORS restrictions, auth may not work in all browsers",
+                "- The system will automatically try fallback endpoints",
                 "info",
             );
-            log("- If auth fails, try again without authentication", "info");
+            log(
+                "- Authentication provides access to premium data but may fail due to CORS",
+                "info",
+            );
+            log("- If anything fails, try Quick Connect first", "info");
             log("", "info");
         </script>
     </body>
