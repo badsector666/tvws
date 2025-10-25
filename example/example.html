@@ -255,17 +255,234 @@
                 <button id="connectBtn" onclick="testConnection()">
                     Connect to TradingView
                 </button>
-                <button id="candlesBtn" onclick="loadData()" disabled>
-                    Get EUR/USD Data
-                </button>
                 <button id="clearBtn" onclick="clearResults()">
                     Clear Results
                 </button>
                 <button id="clearLogBtn" onclick="clearLog()">Clear Log</button>
             </div>
 
+            <!-- Custom K-Line Query Interface -->
+            <div
+                class="kline-query-section"
+                style="
+                    margin-top: 20px;
+                    padding: 15px;
+                    background-color: #f8f9fa;
+                    border: 1px solid #dee2e6;
+                    border-radius: 4px;
+                "
+            >
+                <h3>📊 K-Line Query Configuration</h3>
+
+                <!-- Ticker Symbol Input -->
+                <div style="margin: 10px 0">
+                    <label
+                        for="tickerInput"
+                        style="
+                            display: block;
+                            margin-bottom: 5px;
+                            font-weight: bold;
+                        "
+                    >
+                        Ticker Symbol:
+                    </label>
+                    <input
+                        type="text"
+                        id="tickerInput"
+                        placeholder="e.g., BINANCE:BTCUSDT.P, FX:EURUSD, NASDAQ:AAPL"
+                        value="FX:EURUSD"
+                        style="
+                            width: 300px;
+                            padding: 8px;
+                            border-radius: 4px;
+                            border: 1px solid #ced4da;
+                            margin-right: 10px;
+                        "
+                    />
+                    <select
+                        id="tickerPreset"
+                        onchange="selectPresetTicker()"
+                        style="
+                            padding: 8px;
+                            border-radius: 4px;
+                            border: 1px solid #ced4da;
+                        "
+                    >
+                        <option value="">Quick Select Ticker...</option>
+                        <optgroup label="Crypto">
+                            <option value="BINANCE:BTCUSDT.P">
+                                BINANCE:BTCUSDT.P
+                            </option>
+                            <option value="BINANCE:ETHUSDT.P">
+                                BINANCE:ETHUSDT.P
+                            </option>
+                            <option value="BINANCE:ADAUSDT.P">
+                                BINANCE:ADAUSDT.P
+                            </option>
+                            <option value="BINANCE:SOLUSDT.P">
+                                BINANCE:SOLUSDT.P
+                            </option>
+                            <option value="CRYPTO:BTCUSD">CRYPTO:BTCUSD</option>
+                            <option value="CRYPTO:ETHUSD">CRYPTO:ETHUSD</option>
+                        </optgroup>
+                        <optgroup label="Forex">
+                            <option value="FX:EURUSD">FX:EURUSD</option>
+                            <option value="FX:GBPUSD">FX:GBPUSD</option>
+                            <option value="FX:USDJPY">FX:USDJPY</option>
+                            <option value="FX:AUDUSD">FX:AUDUSD</option>
+                            <option value="FX:USDCAD">FX:USDCAD</option>
+                        </optgroup>
+                        <optgroup label="Stocks">
+                            <option value="NASDAQ:AAPL">NASDAQ:AAPL</option>
+                            <option value="NASDAQ:GOOGL">NASDAQ:GOOGL</option>
+                            <option value="NASDAQ:MSFT">NASDAQ:MSFT</option>
+                            <option value="NYSE:TSLA">NYSE:TSLA</option>
+                            <option value="NYSE:GME">NYSE:GME</option>
+                        </optgroup>
+                        <optgroup label="Indices">
+                            <option value="INDEX:SPX">
+                                INDEX:SPX (S&P 500)
+                            </option>
+                            <option value="INDEX:DJI">
+                                INDEX:DJI (Dow Jones)
+                            </option>
+                            <option value="INDEX:IXIC">
+                                INDEX:IXIC (NASDAQ)
+                            </option>
+                            <option value="INDEX:VIX">
+                                INDEX:VIX (Volatility)
+                            </option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <!-- Timeframe and Amount Selection -->
+                <div
+                    style="
+                        display: flex;
+                        gap: 15px;
+                        margin: 10px 0;
+                        align-items: center;
+                    "
+                >
+                    <div>
+                        <label
+                            for="timeframeSelect"
+                            style="
+                                display: block;
+                                margin-bottom: 5px;
+                                font-weight: bold;
+                            "
+                        >
+                            Timeframe:
+                        </label>
+                        <select
+                            id="timeframeSelect"
+                            style="
+                                padding: 8px;
+                                border-radius: 4px;
+                                border: 1px solid #ced4da;
+                            "
+                        >
+                            <option value="1m">1 Minute</option>
+                            <option value="3m">3 Minutes</option>
+                            <option value="5m">5 Minutes</option>
+                            <option value="15m">15 Minutes</option>
+                            <option value="30m">30 Minutes</option>
+                            <option value="45m">45 Minutes</option>
+                            <option value="1h">1 Hour</option>
+                            <option value="2h">2 Hours</option>
+                            <option value="3h">3 Hours</option>
+                            <option value="4h">4 Hours</option>
+                            <option value="1D" selected>1 Day</option>
+                            <option value="1W">1 Week</option>
+                            <option value="1M">1 Month</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label
+                            for="amountInput"
+                            style="
+                                display: block;
+                                margin-bottom: 5px;
+                                font-weight: bold;
+                            "
+                        >
+                            Number of K-Lines:
+                        </label>
+                        <input
+                            type="number"
+                            id="amountInput"
+                            min="1"
+                            max="500"
+                            value="10"
+                            style="
+                                width: 80px;
+                                padding: 8px;
+                                border-radius: 4px;
+                                border: 1px solid #ced4da;
+                            "
+                        />
+                    </div>
+
+                    <div>
+                        <label
+                            for="extendedDataCheck"
+                            style="
+                                display: block;
+                                margin-bottom: 5px;
+                                font-weight: bold;
+                            "
+                        >
+                            Extended Data:
+                        </label>
+                        <label
+                            style="display: flex; align-items: center; gap: 5px"
+                        >
+                            <input
+                                type="checkbox"
+                                id="extendedDataCheck"
+                                style="margin: 0"
+                            />
+                            <span style="font-size: 12px"
+                                >Include additional details</span
+                            >
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Fetch Button -->
+                <div style="margin-top: 15px">
+                    <button
+                        id="candlesBtn"
+                        onclick="loadData()"
+                        disabled
+                        style="background-color: #007bff"
+                    >
+                        📊 Get K-Line Data
+                    </button>
+                    <button
+                        onclick="resetQueryForm()"
+                        style="background-color: #6c757d; margin-left: 5px"
+                    >
+                        🔄 Reset Form
+                    </button>
+                </div>
+            </div>
+
             <div id="results" class="results" style="display: none">
-                <h3>EUR/USD Candle Data (Daily)</h3>
+                <h3 id="resultsTitle">K-Line Data</h3>
+                <div
+                    id="queryInfo"
+                    style="
+                        margin-bottom: 10px;
+                        padding: 8px;
+                        background-color: #e9ecef;
+                        border-radius: 4px;
+                        font-size: 14px;
+                    "
+                ></div>
                 <div id="candleData"></div>
             </div>
 
@@ -550,25 +767,84 @@
                     return;
                 }
 
+                // Get custom parameters from the form
+                const ticker = document
+                    .getElementById("tickerInput")
+                    .value.trim();
+                const timeframe =
+                    document.getElementById("timeframeSelect").value;
+                const amount = parseInt(
+                    document.getElementById("amountInput").value,
+                );
+                const extendedData =
+                    document.getElementById("extendedDataCheck").checked;
+                const selectedEndpoint =
+                    document.getElementById("endpointSelect").value;
+
+                // Validate inputs
+                if (!ticker) {
+                    log("❌ Please enter a ticker symbol", "error");
+                    updateStatus("Please enter a ticker symbol", "error");
+                    return;
+                }
+
+                // Validate symbol/timeframe combination
+                const validation = validateSymbolTimeframe(
+                    ticker,
+                    timeframe,
+                    selectedEndpoint,
+                );
+                if (validation.issues.length > 0) {
+                    log("⚠️ Potential Issues Detected:", "warning");
+                    validation.issues.forEach((issue) =>
+                        log(`- ${issue}`, "warning"),
+                    );
+                    log("💡 Suggestions:", "info");
+                    validation.suggestions.forEach((suggestion) =>
+                        log(`- ${suggestion}`, "info"),
+                    );
+                    log("Proceeding anyway...", "info");
+                }
+
+                if (amount < 1 || amount > 500) {
+                    log(
+                        "❌ Number of K-Lines must be between 1 and 500",
+                        "error",
+                    );
+                    updateStatus("Invalid number of K-Lines", "error");
+                    return;
+                }
+
                 const candlesBtn = document.getElementById("candlesBtn");
                 const resultsDiv = document.getElementById("results");
                 const candleDataDiv = document.getElementById("candleData");
+                const resultsTitle = document.getElementById("resultsTitle");
+                const queryInfo = document.getElementById("queryInfo");
 
                 candlesBtn.disabled = true;
                 candlesBtn.textContent = "Loading...";
-                updateStatus("Fetching EUR/USD candle data...", "info");
+
+                // Update UI to show what we're fetching
+                const timeframeText = getTimeframeText(timeframe);
+                resultsTitle.textContent = `${ticker} K-Line Data (${timeframeText})`;
+                updateStatus(
+                    `Fetching ${ticker} data (${timeframeText})...`,
+                    "info",
+                );
 
                 log("=== Data Fetch Started ===", "info");
-                log("Symbol: FX:EURUSD");
-                log("Timeframe: 1D (Daily)");
-                log("Amount: 10 candles");
+                log(`Symbol: ${ticker}`);
+                log(`Timeframe: ${timeframe} (${timeframeText})`);
+                log(`Amount: ${amount} candles`);
+                log(`Extended Data: ${extendedData ? "Enabled" : "Disabled"}`);
+                log(`Endpoint: ${selectedEndpoint}`);
 
                 try {
                     const candles = await getCandles({
                         connection,
-                        symbols: ["FX:EURUSD"],
-                        amount: 10,
-                        timeframe: "1D",
+                        symbols: [ticker],
+                        amount: amount,
+                        timeframe: timeframe,
                     });
 
                     if (candles.length > 0 && candles[0].length > 0) {
@@ -577,26 +853,70 @@
                             "success",
                         );
 
+                        // Display query info
+                        queryInfo.innerHTML = `
+                            <strong>Query Parameters:</strong>
+                            Symbol: <code>${ticker}</code> |
+                            Timeframe: <code>${timeframe}</code> |
+                            Candles: <code>${amount}</code> |
+                            Received: <code>${candles[0].length}</code> |
+                            Endpoint: <code>${selectedEndpoint}</code>
+                        `;
+
                         // Display candle data
                         candleDataDiv.innerHTML = "";
                         candles[0].forEach((candle, index) => {
                             const date = new Date(candle.timestamp * 1000);
                             const candleEl = document.createElement("div");
                             candleEl.className = "candle-item";
-                            candleEl.innerHTML = `
-                            <strong>Candle ${index + 1}:</strong> ${date.toLocaleDateString()} |
-                            Open: ${candle.open.toFixed(5)} |
-                            High: ${candle.high.toFixed(5)} |
-                            Low: ${candle.low.toFixed(5)} |
-                            Close: ${candle.close.toFixed(5)} |
-                            Volume: ${candle.volume}
-                        `;
+
+                            let candleHtml = `
+                                <strong>Candle ${index + 1}:</strong> ${date.toLocaleString()} |
+                                Open: ${candle.open.toFixed(5)} |
+                                High: ${candle.high.toFixed(5)} |
+                                Low: ${candle.low.toFixed(5)} |
+                                Close: ${candle.close.toFixed(5)} |
+                                Volume: ${candle.volume}
+                            `;
+
+                            // Add extended data if enabled
+                            if (extendedData && candle.vwap !== undefined) {
+                                candleHtml += ` | VWAP: ${candle.vwap.toFixed(5)}`;
+                            }
+                            if (extendedData && candle.trades !== undefined) {
+                                candleHtml += ` | Trades: ${candle.trades}`;
+                            }
+
+                            candleEl.innerHTML = candleHtml;
                             candleDataDiv.appendChild(candleEl);
                         });
 
                         resultsDiv.style.display = "block";
-                        updateStatus("Data loaded successfully!", "success");
+                        updateStatus(
+                            `✅ ${ticker} data loaded successfully!`,
+                            "success",
+                        );
                         log("✅ Data displayed in results section", "success");
+
+                        // Log price statistics
+                        const closes = candles[0].map((c) => c.close);
+                        const lastPrice = closes[closes.length - 1];
+                        const firstPrice = closes[0];
+                        const change = (
+                            ((lastPrice - firstPrice) / firstPrice) *
+                            100
+                        ).toFixed(2);
+                        const high = Math.max(...candles[0].map((c) => c.high));
+                        const low = Math.min(...candles[0].map((c) => c.low));
+
+                        log(`📊 Price Summary:`, "info");
+                        log(`   Last Price: ${lastPrice.toFixed(5)}`, "info");
+                        log(
+                            `   Change: ${change}%`,
+                            change >= 0 ? "success" : "warning",
+                        );
+                        log(`   High: ${high.toFixed(5)}`, "info");
+                        log(`   Low: ${low.toFixed(5)}`, "info");
                     } else {
                         log(
                             "⚠️ No data received - possible reasons:",
@@ -610,9 +930,13 @@
                             "- Insufficient data for requested timeframe",
                             "warning",
                         );
+                        log(
+                            "- Symbol may be delisted or temporarily unavailable",
+                            "warning",
+                        );
                         log("- Try a different symbol or endpoint", "info");
                         updateStatus(
-                            "No data available for this symbol.",
+                            `No data available for ${ticker}.`,
                             "warning",
                         );
                     }
@@ -622,16 +946,137 @@
                         error?.toString() ||
                         "Unknown error occurred";
                     log(`❌ Data fetch failed: ${errorMessage}`, "error");
+                    log("Troubleshooting tips:", "warning");
+
+                    // Specific troubleshooting based on error type
+                    if (
+                        errorMessage.includes("critical_error") ||
+                        errorMessage.includes("error")
+                    ) {
+                        log("🚨 Critical Error Detected:", "error");
+                        log(
+                            "- This usually means the symbol/timeframe is not supported",
+                            "error",
+                        );
+                        log("- Try these solutions:", "info");
+                        log(
+                            "  • Use daily timeframe (1D) for crypto symbols",
+                            "info",
+                        );
+                        log(
+                            "  • Try forex symbols for intraday data (FX:EURUSD)",
+                            "info",
+                        );
+                        log(
+                            "  • Use prodata endpoint if you have premium access",
+                            "info",
+                        );
+                        log(
+                            "  • Try different crypto symbols (CRYPTO:BTCUSD)",
+                            "info",
+                        );
+                    } else {
+                        log(
+                            "- Check if the ticker symbol is correct",
+                            "warning",
+                        );
+                        log(
+                            "- Try a different timeframe (1D usually works)",
+                            "warning",
+                        );
+                        log(
+                            "- Some symbols require specific endpoints",
+                            "warning",
+                        );
+                        log(
+                            "- Check if the market is currently open for this symbol",
+                            "warning",
+                        );
+                    }
+
                     updateStatus(
                         `Failed to fetch data: ${errorMessage}`,
                         "error",
                     );
                 } finally {
+                    // Always re-enable the button, regardless of success or failure
                     candlesBtn.disabled = false;
-                    candlesBtn.textContent = "Get EUR/USD Data";
+                    candlesBtn.textContent = "📊 Get K-Line Data";
                     log("=== Data Fetch Completed ===", "info");
+                    log(
+                        "🔄 You can try different settings and fetch again",
+                        "info",
+                    );
                 }
             };
+
+            // Helper function to get readable timeframe text
+            function getTimeframeText(timeframe) {
+                const timeframeMap = {
+                    "1m": "1 Minute",
+                    "3m": "3 Minutes",
+                    "5m": "5 Minutes",
+                    "15m": "15 Minutes",
+                    "30m": "30 Minutes",
+                    "45m": "45 Minutes",
+                    "1h": "1 Hour",
+                    "2h": "2 Hours",
+                    "3h": "3 Hours",
+                    "4h": "4 Hours",
+                    "1D": "1 Day",
+                    "1W": "1 Week",
+                    "1M": "1 Month",
+                };
+                return timeframeMap[timeframe] || timeframe;
+            }
+
+            // Function to validate if symbol/timeframe combination is likely to work
+            function validateSymbolTimeframe(ticker, timeframe, endpoint) {
+                const issues = [];
+                const suggestions = [];
+
+                // Check for common crypto intraday limitations
+                if (ticker.includes("BINANCE:") || ticker.includes("CRYPTO:")) {
+                    if (
+                        ["1m", "3m", "5m", "15m", "30m", "45m"].includes(
+                            timeframe,
+                        )
+                    ) {
+                        if (endpoint === "data") {
+                            issues.push(
+                                "Crypto intraday data may not be available on free endpoint",
+                            );
+                            suggestions.push("Try timeframe: 1h, 4h, or 1D");
+                            suggestions.push(
+                                "Or try endpoint: prodata (requires premium)",
+                            );
+                        }
+                    }
+                }
+
+                // Check for stock market hours issues
+                if (ticker.includes("NASDAQ:") || ticker.includes("NYSE:")) {
+                    const now = new Date();
+                    const day = now.getDay();
+                    const hour = now.getHours();
+
+                    if (day === 0 || day === 6) {
+                        issues.push("Stock markets are closed on weekends");
+                        suggestions.push(
+                            "Try during market hours (Mon-Fri, 9:30 AM - 4:00 PM EST)",
+                        );
+                    } else if (hour < 10 || hour > 16) {
+                        issues.push(
+                            "Stock markets may be closed (outside 9:30 AM - 4:00 PM EST)",
+                        );
+                        suggestions.push(
+                            "Try during market hours or use daily timeframe (1D)",
+                        );
+                    }
+                }
+
+                return { issues, suggestions };
+            }
 
             window.clearResults = function () {
                 document.getElementById("results").style.display = "none";
@@ -642,6 +1087,24 @@
 
             window.clearLog = function () {
                 document.getElementById("log").textContent = "";
+            };
+
+            // New functions for custom K-Line query interface
+            window.selectPresetTicker = function () {
+                const preset = document.getElementById("tickerPreset").value;
+                if (preset) {
+                    document.getElementById("tickerInput").value = preset;
+                    log(`Selected preset ticker: ${preset}`, "info");
+                }
+            };
+
+            window.resetQueryForm = function () {
+                document.getElementById("tickerInput").value = "FX:EURUSD";
+                document.getElementById("tickerPreset").value = "";
+                document.getElementById("timeframeSelect").value = "1D";
+                document.getElementById("amountInput").value = "10";
+                document.getElementById("extendedDataCheck").checked = false;
+                log("Query form reset to default values", "info");
             };
 
             function updateStatus(message, type = "info") {
@@ -660,6 +1123,9 @@
                 logEl.scrollTop = logEl.scrollHeight;
             }
 
+            // Make log function globally available for HTML handlers
+            window.log = log;
+
             // Initialize
             log("TradingView WebSocket Example loaded", "success");
             log("Package: tvws (Browser Compatible)", "info");
@@ -675,7 +1141,8 @@
                 '1. Click "🚀 Quick Connect (No Auth)" - bypasses all settings',
                 "info",
             );
-            log('2. Click "Get EUR/USD Data" once connected', "info");
+            log("2. Configure your K-Line query below", "info");
+            log('3. Click "📊 Get K-Line Data" once connected', "info");
             log("", "info");
             log("=== Advanced Options ===", "info");
             log("1. Select a WebSocket endpoint (recommended: data)", "info");
@@ -684,7 +1151,19 @@
                 "info",
             );
             log('3. Click "Connect to TradingView"', "info");
-            log('4. Click "Get EUR/USD Data" once connected', "info");
+            log("4. Configure your query parameters in the form below", "info");
+            log('5. Click "📊 Get K-Line Data" once connected', "info");
+            log("", "info");
+            log("📊 K-Line Query Features:", "info");
+            log(
+                "- Custom ticker symbols (e.g., BINANCE:BTCUSDT.P, FX:EURUSD)",
+                "info",
+            );
+            log("- Multiple timeframes: 1m to 1M", "info");
+            log("- Adjustable number of candles (1-500)", "info");
+            log("- Quick selection from popular tickers", "info");
+            log("- Extended data option (VWAP, trades)", "info");
+            log("- Price statistics and change calculations", "info");
             log("", "info");
             log("💡 Tips:", "info");
             log("- Use Quick Connect for fastest connection testing", "info");
@@ -697,6 +1176,14 @@
                 "info",
             );
             log("- If anything fails, try Quick Connect first", "info");
+            log("- Try different timeframes if data is unavailable", "info");
+            log("- Some symbols may require specific endpoints", "info");
+            log("", "info");
+            log("🔍 Popular Ticker Formats:", "info");
+            log("- Crypto: BINANCE:BTCUSDT.P, CRYPTO:BTCUSD", "info");
+            log("- Forex: FX:EURUSD, FX:GBPUSD", "info");
+            log("- Stocks: NASDAQ:AAPL, NYSE:TSLA", "info");
+            log("- Indices: INDEX:SPX, INDEX:DJI", "info");
             log("", "info");
         </script>
     </body>

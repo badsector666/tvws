@@ -1,0 +1,277 @@
+# DeepWiki Q&A with Code Context for Repository: endenwer/tradingview-ws
+## Q1
+Current repo is sequential request and response, how can I make it concurrent and parallel?
+### Answer
+# Answer
+
+The current `getCandles` function in this codebase processes symbols **sequentially** - it waits for each symbol to complete before moving to the next one tradingview-ws:191-210 . To make it concurrent and parallel, you would need to refactor the implementation to handle multiple symbols simultaneously.
+
+## Current Sequential Implementation
+
+The sequential nature is evident in the event handler logic where `currentSymIndex` tracks which symbol is being processed, and only after receiving `series_completed` or `symbol_error` events does it increment to the next symbol tradingview-ws:152-154 . The function uses a single subscription that processes one symbol at a time tradingview-ws:156-216 .
+
+## How to Make It Concurrent
+
+To enable parallel processing, you would need to:
+
+1. **Create separate chart sessions per symbol** - Instead of reusing `chartSession` for all symbols, generate a unique session ID for each symbol (e.g., `cs_${symbol}_${randomstring.generate(12)}`) tradingview-ws:147-148 .
+
+2. **Track candles per symbol independently** - Replace the single `currentSymCandles` array with a map structure like `Map<string, RawCandle[]>` to accumulate data for each symbol independently tradingview-ws:154-154 .
+
+3. **Send all symbol requests upfront** - Instead of waiting for `series_completed` to trigger the next symbol request, send `resolve_symbol` and `create_series` commands for all symbols immediately after creating their respective chart sessions tradingview-ws:218-226 .
+
+4. **Handle events for all symbols concurrently** - Modify the event handler to identify which symbol each event belongs to (using the session ID or series ID from the event params) and update the corresponding symbol's candle array tradingview-ws:158-165 .
+
+5. **Resolve when all symbols complete** - Track completion status for each symbol and only resolve the promise when all symbols have received their `series_completed` or `symbol_error` events tradingview-ws:169-215 .
+
+## Notes
+
+The WebSocket connection itself is already shared across all requests via the `TradingviewConnection` object tradingview-ws:31-35 , so the parallelization would happen at the protocol level by sending multiple concurrent requests over the same WebSocket. The TradingView WebSocket API appears to support this pattern since it uses session IDs to distinguish between different data streams tradingview-ws:218-226 . However, you should test whether TradingView's API has any rate limits or restrictions on concurrent requests per connection<cite />.
+
+Wiki pages you might want to explore:
+- [API Reference (endenwer/tradingview-ws)](/wiki/endenwer/tradingview-ws#3)
+### Citations
+**File:** src/index.ts (L31-35)
+```typescript
+interface TradingviewConnection {
+  subscribe: (handler: Subscriber) => Unsubscriber
+  send: (name: string, params: any[]) => void
+  close: () => Promise<void>
+}
+```
+**File:** src/index.ts (L147-148)
+```typescript
+  const chartSession = "cs_" + randomstring.generate(12)
+  const batchSize = amount && amount < MAX_BATCH_SIZE ? amount : MAX_BATCH_SIZE
+```
+**File:** src/index.ts (L152-154)
+```typescript
+    let currentSymIndex = 0
+    let symbol = symbols[currentSymIndex]
+    let currentSymCandles: RawCandle[] = []
+```
+**File:** src/index.ts (L156-216)
+```typescript
+    const unsubscribe = connection.subscribe(event => {
+      // received new candles
+      if (event.name === 'timescale_update') {
+        let newCandles: RawCandle[] = event.params[1]['sds_1']['s']
+        if (newCandles.length > batchSize) {
+          // sometimes tradingview sends already received candles
+          newCandles = newCandles.slice(0, -currentSymCandles.length)
+        }
+        currentSymCandles = newCandles.concat(currentSymCandles)
+        return
+      }
+
+      // loaded all requested candles
+      if (['series_completed', 'symbol_error'].includes(event.name)) {
+        const loadedCount = currentSymCandles.length
+        if (loadedCount > 0 && loadedCount % batchSize === 0 && (!amount || loadedCount < amount)) {
+          connection.send('request_more_data', [chartSession, 'sds_1', batchSize])
+          return
+        }
+
+        // loaded all candles for current symbol
+
+        if (amount) currentSymCandles = currentSymCandles.slice(0, amount)
+
+        const candles = currentSymCandles.map(c => ({
+          timestamp: c.v[0],
+          open: c.v[1],
+          high: c.v[2],
+          low: c.v[3],
+          close: c.v[4],
+          volume: c.v[5]
+        }))
+        allCandles.push(candles)
+
+        // next symbol
+        if (symbols.length - 1 > currentSymIndex) {
+          currentSymCandles = []
+          currentSymIndex += 1
+          symbol = symbols[currentSymIndex]
+          connection.send('resolve_symbol', [
+            chartSession,
+            `sds_sym_${currentSymIndex}`,
+            '=' + JSON.stringify({ symbol, adjustment: 'splits' })
+          ])
+
+          connection.send('modify_series', [
+            chartSession,
+            'sds_1',
+            `s${currentSymIndex}`,
+            `sds_sym_${currentSymIndex}`,
+            timeframe.toString(),
+            ''
+          ])
+          return
+        }
+
+        // all symbols loaded
+        unsubscribe()
+        resolve(allCandles)
+      }
+    })
+```
+**File:** src/index.ts (L218-226)
+```typescript
+    connection.send('chart_create_session', [chartSession, ''])
+    connection.send('resolve_symbol', [
+      chartSession,
+      `sds_sym_0`,
+      '=' + JSON.stringify({ symbol, adjustment: 'splits' })
+    ])
+    connection.send('create_series', [
+      chartSession, 'sds_1', 's0', 'sds_sym_0', timeframe.toString(), batchSize, ''
+    ])
+```
+## Q2
+Now how can I stream the results instead waiting one by one to finish? That way when some of the parallel request finish it's response then immediately used by others, it will improve the speed.
+### Answer
+# Answer
+
+You're asking about converting the `getCandles` function from returning a single `Promise<Candle[][]>` that resolves when all symbols complete, to a **streaming API** that yields results as each symbol finishes tradingview-ws:144-150 .
+
+## Streaming Approach with Async Generator
+
+The most idiomatic way to stream results in TypeScript is to convert `getCandles` into an **async generator function** that yields `Candle[]` for each symbol as it completes<cite />:
+
+```typescript
+async function* getCandlesStream({ connection, symbols, amount, timeframe = 60 }) {
+  // Implementation yields results as they arrive
+}
+```
+
+This allows consumers to process results immediately:
+
+```typescript
+for await (const candles of getCandlesStream({ connection, symbols, ... })) {
+  // Process candles immediately when available
+  processCandles(candles)
+}
+```
+
+## Implementation Strategy
+
+To implement streaming with parallel requests:
+
+1. **Create separate chart sessions for each symbol** - Generate unique session IDs like `cs_${symbol}_${randomstring.generate(12)}` for each symbol upfront tradingview-ws:147-147 .
+
+2. **Send all requests immediately** - Issue `chart_create_session`, `resolve_symbol`, and `create_series` commands for all symbols at once, rather than waiting for each to complete tradingview-ws:218-226 .
+
+3. **Track per-symbol state** - Use a `Map<string, RawCandle[]>` to accumulate candles for each session independently tradingview-ws:154-154 .
+
+4. **Yield on completion events** - In the event handler, when you receive `series_completed` or `symbol_error` for a session, transform that symbol's candles and yield them immediately tradingview-ws:169-187 .
+
+5. **Handle pagination per symbol** - Each symbol may need multiple `request_more_data` calls independently based on its own `loadedCount % batchSize` check tradingview-ws:171-173 .
+
+## Key Differences from Current Implementation
+
+The current implementation processes symbols sequentially - it only sends the next symbol's request after the previous one completes tradingview-ws:191-209 . With streaming:
+
+- All symbol requests are sent **immediately** at the start
+- Results are **yielded as they arrive**, not collected in an array
+- The event handler identifies which symbol completed using session/series IDs from `event.params` tradingview-ws:158-159
+- No need for `currentSymIndex` tracking since all symbols are in flight simultaneously tradingview-ws:152-152
+
+## Notes
+
+The WebSocket connection already supports concurrent requests through its session-based protocol tradingview-ws:31-35 . The `timescale_update` events include session identifiers in their params that you can use to route data to the correct symbol tradingview-ws:158-164 . You'll need to parse these identifiers from `event.params` to determine which symbol each event corresponds to<cite />.
+
+Wiki pages you might want to explore:
+- [API Reference (endenwer/tradingview-ws)](/wiki/endenwer/tradingview-ws#3)
+### Citations
+**File:** src/index.ts (L31-35)
+```typescript
+interface TradingviewConnection {
+  subscribe: (handler: Subscriber) => Unsubscriber
+  send: (name: string, params: any[]) => void
+  close: () => Promise<void>
+}
+```
+**File:** src/index.ts (L144-150)
+```typescript
+export async function getCandles({ connection, symbols, amount, timeframe = 60 }: GetCandlesParams) {
+  if (symbols.length === 0) return []
+
+  const chartSession = "cs_" + randomstring.generate(12)
+  const batchSize = amount && amount < MAX_BATCH_SIZE ? amount : MAX_BATCH_SIZE
+
+  return new Promise<Candle[][]>(resolve => {
+```
+**File:** src/index.ts (L152-152)
+```typescript
+    let currentSymIndex = 0
+```
+**File:** src/index.ts (L154-154)
+```typescript
+    let currentSymCandles: RawCandle[] = []
+```
+**File:** src/index.ts (L158-164)
+```typescript
+      if (event.name === 'timescale_update') {
+        let newCandles: RawCandle[] = event.params[1]['sds_1']['s']
+        if (newCandles.length > batchSize) {
+          // sometimes tradingview sends already received candles
+          newCandles = newCandles.slice(0, -currentSymCandles.length)
+        }
+        currentSymCandles = newCandles.concat(currentSymCandles)
+```
+**File:** src/index.ts (L169-187)
+```typescript
+      if (['series_completed', 'symbol_error'].includes(event.name)) {
+        const loadedCount = currentSymCandles.length
+        if (loadedCount > 0 && loadedCount % batchSize === 0 && (!amount || loadedCount < amount)) {
+          connection.send('request_more_data', [chartSession, 'sds_1', batchSize])
+          return
+        }
+
+        // loaded all candles for current symbol
+
+        if (amount) currentSymCandles = currentSymCandles.slice(0, amount)
+
+        const candles = currentSymCandles.map(c => ({
+          timestamp: c.v[0],
+          open: c.v[1],
+          high: c.v[2],
+          low: c.v[3],
+          close: c.v[4],
+          volume: c.v[5]
+        }))
+```
+**File:** src/index.ts (L191-209)
+```typescript
+        if (symbols.length - 1 > currentSymIndex) {
+          currentSymCandles = []
+          currentSymIndex += 1
+          symbol = symbols[currentSymIndex]
+          connection.send('resolve_symbol', [
+            chartSession,
+            `sds_sym_${currentSymIndex}`,
+            '=' + JSON.stringify({ symbol, adjustment: 'splits' })
+          ])
+
+          connection.send('modify_series', [
+            chartSession,
+            'sds_1',
+            `s${currentSymIndex}`,
+            `sds_sym_${currentSymIndex}`,
+            timeframe.toString(),
+            ''
+          ])
+          return
+```
+**File:** src/index.ts (L218-226)
+```typescript
+    connection.send('chart_create_session', [chartSession, ''])
+    connection.send('resolve_symbol', [
+      chartSession,
+      `sds_sym_0`,
+      '=' + JSON.stringify({ symbol, adjustment: 'splits' })
+    ])
+    connection.send('create_series', [
+      chartSession, 'sds_1', 's0', 'sds_sym_0', timeframe.toString(), batchSize, ''
+    ])
+```
+https://deepwiki.com/search/current-repo-is-sequential-req_a159dbce-b146-41e8-9036-732f8bda5ec4?mode=fast
