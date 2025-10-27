@@ -1,6 +1,6 @@
 {
   "name": "tvws",
-  "version": "0.0.5",
+  "version": "0.0.5.1",
   "type": "module",
   "description": "Browser-compatible TradingView WebSocket API with multiple endpoints support",
   "repository": {
