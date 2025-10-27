@@ -4,11 +4,11 @@ import {
   connect,
   getCandles,
   ENDPOINTS,
-} from "https://unpkg.com/tvws@latest/dist/index.js";
+} from "https://unpkg.com/tvws@0.0.4/dist/index.js";
 
 // Alternative CDN options:
-// jsDelivr: import { connect, getCandles, ENDPOINTS } from "https://cdn.jsdelivr.net/npm/tvws@latest/dist/index.js";
-// Specific version: import { connect, getCandles, ENDPOINTS } from "https://unpkg.com/tvws@0.0.4/dist/index.js";
+// jsDelivr: import { connect, getCandles, ENDPOINTS } from "https://cdn.jsdelivr.net/npm/tvws@0.0.4/dist/index.js";
+// Latest version: import { connect, getCandles, ENDPOINTS } from "https://unpkg.com/tvws@latest/dist/index.js";
 
 // For development (when serving from project root):
 // import { connect, getCandles, ENDPOINTS } from "../dist/index.js";
@@ -664,7 +664,7 @@ function log(message, type = "info") {
 function initializeLogging() {
   log("TradingView WebSocket Example loaded", "success");
   log("Package: tvws (Browser Compatible with CDN)", "info");
-  log("Imported from: https://unpkg.com/tvws@latest/dist/index.js", "info");
+  log("Imported from: https://unpkg.com/tvws@0.0.4/dist/index.js", "info");
   log("Ready to connect!", "success");
   log("", "info");
   log("=== Instructions ===", "info");
