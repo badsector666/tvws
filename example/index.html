@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>TradingView WebSocket Example - tvws</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="container">
+            <!-- Header -->
+            <div class="header">
+                <h1>🚀 TradingView WebSocket Example</h1>
+                <p>
+                    Test the <strong>tvws</strong> package with different
+                    endpoints, authentication options, and data queries.
+                </p>
+            </div>
+
+            <!-- Status Alerts -->
+            <div id="status" class="alert info" style="display: none"></div>
+            <div id="success" class="alert success" style="display: none"></div>
+            <div id="error" class="alert error" style="display: none"></div>
+            <div id="info" class="alert info" style="display: none"></div>
+            <div id="warning" class="alert warning" style="display: none"></div>
+
+            <!-- Endpoint Selection -->
+            <div class="section-card endpoint-selector">
+                <h3>📡 WebSocket Endpoint</h3>
+                <div class="form-group">
+                    <label for="endpointSelect" class="form-label"
+                        >Select Endpoint:</label
+                    >
+                    <select id="endpointSelect" class="form-control">
+                        <option value="data">data (recommended)</option>
+                        <option value="prodata">prodata (premium)</option>
+                        <option value="widgetdata">widgetdata</option>
+                        <option value="charts-polygon">charts-polygon</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Authentication Section -->
+            <div class="section-card auth-section">
+                <h3>🔐 Authentication (Optional)</h3>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="authToggle" />
+                        <label for="authToggle">Enable Authentication</label>
+                    </div>
+                </div>
+                <div id="authFields" style="display: none">
+                    <div class="form-group">
+                        <label for="sessionId" class="form-label"
+                            >Session ID:</label
+                        >
+                        <input
+                            type="text"
+                            id="sessionId"
+                            class="form-control"
+                            placeholder="e.g. qsxh1x2yz9i4x8x2..."
+                        />
+                    </div>
+                    <div class="form-group">
+                        <button
+                            type="button"
+                            class="btn btn-outline"
+                            onclick="showSessionHelp()"
+                        >
+                            ❓ Help
+                        </button>
+                    </div>
+                </div>
+                <div
+                    id="sessionHelp"
+                    class="session-help"
+                    style="display: none"
+                >
+                    <h4>How to get Session ID:</h4>
+                    <ol>
+                        <li>
+                            <a
+                                href="https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT"
+                                target="_blank"
+                                >Open TradingView</a
+                            >
+                        </li>
+                        <li>Open browser dev tools (F12)</li>
+                        <li>
+                            Go to Application tab → Cookies → tradingview.com
+                        </li>
+                        <li>Find 'sessionid' cookie value</li>
+                        <li>Copy the entire value (it's long!)</li>
+                        <li>Paste in the session field above</li>
+                    </ol>
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        onclick="hideSessionHelp()"
+                    >
+                        Close Help
+                    </button>
+                </div>
+                <div id="authStatus" class="auth-status"></div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="section-card controls-section">
+                <h3>⚡ Connection Controls</h3>
+                <div class="button-group">
+                    <button
+                        id="quickConnectBtn"
+                        class="btn btn-success"
+                        onclick="quickConnect()"
+                    >
+                        🚀 Quick Connect
+                    </button>
+                    <button
+                        id="connectBtn"
+                        class="btn btn-primary"
+                        onclick="testConnection()"
+                    >
+                        🔗 Connect to TradingView
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearResults()">
+                        🗑️ Clear Results
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearLog()">
+                        📋 Clear Log
+                    </button>
+                </div>
+            </div>
+
+            <!-- K-Line Query Configuration -->
+            <div class="section-card query-section">
+                <h3>📊 K-Line Query Configuration</h3>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tickerPreset" class="form-label"
+                            >Quick Select:</label
+                        >
+                        <select
+                            id="tickerPreset"
+                            class="form-control"
+                            onchange="selectPresetTicker()"
+                        >
+                            <option value="">Choose preset...</option>
+                            <optgroup label="Popular Crypto">
+                                <option value="BINANCE:BTCUSDT.P">
+                                    Bitcoin (Binance)
+                                </option>
+                                <option value="CRYPTO:BTCUSD">
+                                    Bitcoin (Crypto)
+                                </option>
+                                <option value="BINANCE:ETHUSDT.P">
+                                    Ethereum (Binance)
+                                </option>
+                                <option value="CRYPTO:ETHUSD">
+                                    Ethereum (Crypto)
+                                </option>
+                                <option value="BINANCE:DOGEUSDT.P">
+                                    Dogecoin (Binance)
+                                </option>
+                                <option value="CRYPTO:DOGEUSD">
+                                    Dogecoin (Crypto)
+                                </option>
+                                <option value="BINANCE:ADAUSDT.P">
+                                    Cardano (Binance)
+                                </option>
+                                <option value="BINANCE:SOLUSDT.P">
+                                    Solana (Binance)
+                                </option>
+                                <option value="BINANCE:XRPUSDT.P">
+                                    Ripple (Binance)
+                                </option>
+                            </optgroup>
+                            <optgroup label="Popular Forex">
+                                <option value="FX:EURUSD">EUR/USD</option>
+                                <option value="FX:GBPUSD">GBP/USD</option>
+                                <option value="FX:USDJPY">USD/JPY</option>
+                                <option value="FX:USDCHF">USD/CHF</option>
+                                <option value="OANDA:EUR_USD">
+                                    EUR/USD (OANDA)
+                                </option>
+                                <option value="OANDA:GBP_JPY">
+                                    GBP/JPY (OANDA)
+                                </option>
+                            </optgroup>
+                            <optgroup label="Popular Stocks">
+                                <option value="NASDAQ:AAPL">Apple</option>
+                                <option value="NASDAQ:TSLA">Tesla</option>
+                                <option value="NASDAQ:NVDA">NVIDIA</option>
+                                <option value="NYSE:GME">GameStop</option>
+                                <option value="NYSE:BABA">Alibaba</option>
+                                <option value="NASDAQ:AMZN">Amazon</option>
+                                <option value="NASDAQ:GOOGL">Google</option>
+                                <option value="NASDAQ:MSFT">Microsoft</option>
+                                <option value="NASDAQ:META">Meta</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tickerInput" class="form-label"
+                            >Symbol:</label
+                        >
+                        <input
+                            type="text"
+                            id="tickerInput"
+                            class="form-control"
+                            value="FX:EURUSD"
+                            placeholder="e.g. FX:EURUSD"
+                        />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="timeframeSelect" class="form-label"
+                            >Timeframe:</label
+                        >
+                        <select id="timeframeSelect" class="form-control">
+                            <option value="1m">1 minute</option>
+                            <option value="3m">3 minutes</option>
+                            <option value="5m">5 minutes</option>
+                            <option value="15m">15 minutes</option>
+                            <option value="30m">30 minutes</option>
+                            <option value="45m">45 minutes</option>
+                            <option value="1h">1 hour</option>
+                            <option value="2h">2 hours</option>
+                            <option value="3h">3 hours</option>
+                            <option value="4h">4 hours</option>
+                            <option value="1D" selected>1 day</option>
+                            <option value="1W">1 week</option>
+                            <option value="1M">1 month</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="amountInput" class="form-label"
+                            >Number of Candles:</label
+                        >
+                        <input
+                            type="number"
+                            id="amountInput"
+                            class="form-control"
+                            value="10"
+                            min="1"
+                            max="500"
+                        />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="extendedDataCheck" />
+                        <label for="extendedDataCheck"
+                            >Show Extended Data (VWAP, trades)</label
+                        >
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button
+                        id="candlesBtn"
+                        class="btn btn-primary"
+                        onclick="loadData()"
+                        disabled
+                    >
+                        📊 Get K-Line Data
+                    </button>
+                    <button
+                        id="resetQueryBtn"
+                        class="btn btn-outline"
+                        onclick="resetQueryForm()"
+                    >
+                        🔄 Reset Form
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Display -->
+            <div id="results" class="results-container" style="display: none">
+                <h3>📈 K-Line Data Results</h3>
+                <div id="queryInfo" class="query-info"></div>
+                <div id="candleData" class="candle-list"></div>
+            </div>
+
+            <!-- Debug Log -->
+            <div class="debug-log">
+                <h3>📋 Debug Log</h3>
+                <div id="log" class="log-container"></div>
+            </div>
+        </div>
+
+        <script type="module" src="script.js"></script>
+    </body>
+</html>

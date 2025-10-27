@@ -40,7 +40,94 @@ interface TradingviewEvent {
   params: any[];
 }
 
-type TradingviewTimeframe = number | "1D" | "1W" | "1M";
+type TradingviewTimeframe =
+  | "1"
+  | "3"
+  | "5"
+  | "15"
+  | "30"
+  | "45"
+  | "60"
+  | "120"
+  | "180"
+  | "240"
+  | "1D"
+  | "1W"
+  | "1M";
+
+// Allow flexible timeframe input for better user experience
+type FlexibleTimeframe = TradingviewTimeframe | number;
+
+/**
+ * Validates and normalizes timeframe input to TradingView API format
+ * @param timeframe - The timeframe to validate (can be number or various string formats)
+ * @returns Valid TradingView timeframe string
+ * @throws Error if timeframe format is invalid
+ */
+function validateTimeframe(timeframe: FlexibleTimeframe): TradingviewTimeframe {
+  // If already a valid timeframe string, return as is
+  const validTimeframes: TradingviewTimeframe[] = [
+    "1",
+    "3",
+    "5",
+    "15",
+    "30",
+    "45",
+    "60",
+    "120",
+    "180",
+    "240",
+    "1D",
+    "1W",
+    "1M",
+  ];
+
+  if (
+    typeof timeframe === "string" &&
+    validTimeframes.includes(timeframe as TradingviewTimeframe)
+  ) {
+    return timeframe as TradingviewTimeframe;
+  }
+
+  // Convert numeric timeframes to string
+  if (typeof timeframe === "number") {
+    const timeframeStr = timeframe.toString();
+    if (validTimeframes.includes(timeframeStr as TradingviewTimeframe)) {
+      return timeframeStr as TradingviewTimeframe;
+    }
+  }
+
+  // Convert common invalid string formats to valid ones
+  if (typeof timeframe === "string") {
+    const timeframeMap: Record<string, TradingviewTimeframe> = {
+      "1m": "1",
+      "3m": "3",
+      "5m": "5",
+      "15m": "15",
+      "30m": "30",
+      "45m": "45",
+      "1h": "60",
+      "2h": "120",
+      "3h": "180",
+      "4h": "240",
+      "1d": "1D",
+      "1w": "1W",
+      "1M": "1M",
+      D: "1D",
+      W: "1W",
+      M: "1M",
+    };
+
+    const normalized = timeframe.toLowerCase();
+    if (timeframeMap[normalized]) {
+      return timeframeMap[normalized];
+    }
+  }
+
+  throw new Error(
+    `Invalid timeframe: ${timeframe}. Valid timeframes are: ${validTimeframes.join(", ")}`,
+  );
+}
 
 // Available WebSocket endpoints
 export type TradingviewEndpoint =
@@ -171,6 +258,317 @@ async function connectToEndpoint(
   });
 }
 
+export async function getCandlesConcurrent({
+  connection,
+  symbols,
+  amount,
+  timeframe = 60,
+}: GetCandlesParams): Promise<Candle[][]> {
+  if (symbols.length === 0) return [];
+
+  const batchSize = amount && amount < MAX_BATCH_SIZE ? amount : MAX_BATCH_SIZE;
+  const symbolStates = new Map<string, SymbolState>();
+  const sessionMap = new Map<string, string>(); // session -> symbol
+  const results: Candle[][] = [];
+  let completedCount = 0;
+
+  return new Promise<Candle[][]>((resolve, reject) => {
+    // Initialize state for each symbol
+    for (const symbol of symbols) {
+      symbolStates.set(symbol, {
+        candles: [],
+        completed: false,
+        error: false,
+      });
+    }
+
+    const unsubscribe = connection.subscribe((event) => {
+      try {
+        // Handle candle updates
+        if (event.name === "timescale_update") {
+          const sessionData = event.params[1];
+          const sessionId = event.params[0];
+          const symbol = sessionMap.get(sessionId);
+
+          if (!symbol) return;
+
+          const state = symbolStates.get(symbol);
+          if (!state || state.completed) return;
+
+          // Find the series data (could be sds_1 or other series)
+          const seriesKey = Object.keys(sessionData).find(
+            (key) => key.startsWith("sds_") && sessionData[key].s,
+          );
+
+          if (seriesKey) {
+            let newCandles: RawCandle[] = sessionData[seriesKey].s;
+            if (newCandles.length > batchSize) {
+              // Remove already received candles
+              newCandles = newCandles.slice(0, -state.candles.length);
+            }
+            state.candles = newCandles.concat(state.candles);
+          }
+          return;
+        }
+
+        // Handle completion or error
+        if (["series_completed", "symbol_error"].includes(event.name)) {
+          const sessionId = event.params[0];
+          const symbol = sessionMap.get(sessionId);
+
+          if (!symbol) return;
+
+          const state = symbolStates.get(symbol);
+          if (!state || state.completed) return;
+
+          // Check if we need more data
+          const loadedCount = state.candles.length;
+          if (
+            loadedCount > 0 &&
+            loadedCount % batchSize === 0 &&
+            (!amount || loadedCount < amount)
+          ) {
+            connection.send("request_more_data", [
+              sessionId,
+              "sds_1",
+              batchSize,
+            ]);
+            return;
+          }
+
+          // Mark as completed
+          state.completed = true;
+          if (event.name === "symbol_error") {
+            state.error = true;
+          }
+
+          // Process the candles
+          let finalCandles = state.candles;
+          if (amount) {
+            finalCandles = finalCandles.slice(0, amount);
+          }
+
+          const processedCandles = finalCandles.map((c) => ({
+            timestamp: c.v[0],
+            open: c.v[1],
+            high: c.v[2],
+            low: c.v[3],
+            close: c.v[4],
+            volume: c.v[5],
+          }));
+
+          // Store results in original order
+          const originalIndex = symbols.indexOf(symbol);
+          results[originalIndex] = processedCandles;
+
+          completedCount++;
+
+          // Check if all symbols are completed
+          if (completedCount === symbols.length) {
+            unsubscribe();
+            resolve(results);
+          }
+          return;
+        }
+      } catch (error) {
+        console.error("Error processing event:", error);
+        reject(error);
+      }
+    });
+
+    // Send all requests concurrently
+    for (let i = 0; i < symbols.length; i++) {
+      const symbol = symbols[i];
+      const chartSession = `cs_${symbol}_${Math.random().toString(36).substring(2, 14)}`;
+      const symbolSession = `sds_sym_${i}`;
+
+      sessionMap.set(chartSession, symbol);
+
+      connection.send("chart_create_session", [chartSession, ""]);
+      connection.send("resolve_symbol", [
+        chartSession,
+        symbolSession,
+        "=" + JSON.stringify({ symbol, adjustment: "splits" }),
+      ]);
+      const validatedTimeframe = validateTimeframe(timeframe);
+      connection.send("create_series", [
+        chartSession,
+        "sds_1",
+        `s${i}`,
+        symbolSession,
+        validatedTimeframe,
+        batchSize,
+        "",
+      ]);
+    }
+  });
+}
+
+export async function* getCandlesStream({
+  connection,
+  symbols,
+  amount,
+  timeframe = 60,
+}: GetCandlesParams): AsyncGenerator<Candle[], void, unknown> {
+  if (symbols.length === 0) return;
+
+  const batchSize = amount && amount < MAX_BATCH_SIZE ? amount : MAX_BATCH_SIZE;
+  const symbolStates = new Map<string, SymbolState>();
+  const sessionMap = new Map<string, string>(); // session -> symbol
+  const pendingYields: Array<{ symbol: string; candles: Candle[] }> = [];
+  let activeCount = symbols.length;
+  let hasError = false;
+  let errorMessage: string | null = null;
+
+  // Initialize state for each symbol
+  for (const symbol of symbols) {
+    symbolStates.set(symbol, {
+      candles: [],
+      completed: false,
+      error: false,
+    });
+  }
+
+  const unsubscribe = connection.subscribe((event) => {
+    try {
+      // Handle candle updates
+      if (event.name === "timescale_update") {
+        const sessionData = event.params[1];
+        const sessionId = event.params[0];
+        const symbol = sessionMap.get(sessionId);
+
+        if (!symbol) return;
+
+        const state = symbolStates.get(symbol);
+        if (!state || state.completed) return;
+
+        // Find the series data
+        const seriesKey = Object.keys(sessionData).find(
+          (key) => key.startsWith("sds_") && sessionData[key].s,
+        );
+
+        if (seriesKey) {
+          let newCandles: RawCandle[] = sessionData[seriesKey].s;
+          if (newCandles.length > batchSize) {
+            newCandles = newCandles.slice(0, -state.candles.length);
+          }
+          state.candles = newCandles.concat(state.candles);
+        }
+        return;
+      }
+
+      // Handle completion or error
+      if (["series_completed", "symbol_error"].includes(event.name)) {
+        const sessionId = event.params[0];
+        const symbol = sessionMap.get(sessionId);
+
+        if (!symbol) return;
+
+        const state = symbolStates.get(symbol);
+        if (!state || state.completed) return;
+
+        // Check if we need more data
+        const loadedCount = state.candles.length;
+        if (
+          loadedCount > 0 &&
+          loadedCount % batchSize === 0 &&
+          (!amount || loadedCount < amount)
+        ) {
+          connection.send("request_more_data", [sessionId, "sds_1", batchSize]);
+          return;
+        }
+
+        // Mark as completed
+        state.completed = true;
+        if (event.name === "symbol_error") {
+          state.error = true;
+        }
+
+        // Process the candles
+        let finalCandles = state.candles;
+        if (amount) {
+          finalCandles = finalCandles.slice(0, amount);
+        }
+
+        const processedCandles = finalCandles.map((c) => ({
+          timestamp: c.v[0],
+          open: c.v[1],
+          high: c.v[2],
+          low: c.v[3],
+          close: c.v[4],
+          volume: c.v[5],
+        }));
+
+        // Add to pending yields
+        if (processedCandles.length > 0 || !state.error) {
+          pendingYields.push({ symbol, candles: processedCandles });
+        }
+
+        activeCount--;
+
+        // Clean up if all symbols are done
+        if (activeCount === 0) {
+          unsubscribe();
+        }
+        return;
+      }
+    } catch (error) {
+      console.error("Error processing event:", error);
+      hasError = true;
+      errorMessage = error instanceof Error ? error.message : String(error);
+      unsubscribe();
+    }
+  });
+
+  // Send all requests concurrently
+  for (let i = 0; i < symbols.length; i++) {
+    const symbol = symbols[i];
+    const chartSession = `cs_${symbol}_${Math.random().toString(36).substring(2, 14)}`;
+    const symbolSession = `sds_sym_${i}`;
+
+    sessionMap.set(chartSession, symbol);
+
+    connection.send("chart_create_session", [chartSession, ""]);
+    connection.send("resolve_symbol", [
+      chartSession,
+      symbolSession,
+      "=" + JSON.stringify({ symbol, adjustment: "splits" }),
+    ]);
+    const validatedTimeframe = validateTimeframe(timeframe);
+    connection.send("create_series", [
+      chartSession,
+      "sds_1",
+      `s${i}`,
+      symbolSession,
+      validatedTimeframe,
+      batchSize,
+      "",
+    ]);
+  }
+
+  // Yield results as they become available
+  while (activeCount > 0 && !hasError) {
+    if (pendingYields.length > 0) {
+      const { candles } = pendingYields.shift()!;
+      yield candles;
+    } else {
+      // Wait a bit for more results
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
+  // Throw error if one occurred
+  if (hasError && errorMessage) {
+    throw new Error(errorMessage);
+  }
+
+  // Yield any remaining results
+  while (pendingYields.length > 0) {
+    const { candles } = pendingYields.shift()!;
+    yield candles;
+  }
+}
+
 export async function connect(
   options: ConnectionOptions = {},
 ): Promise<TradingviewConnection> {
@@ -230,7 +628,13 @@ interface GetCandlesParams {
   connection: TradingviewConnection;
   symbols: string[];
   amount?: number;
-  timeframe?: TradingviewTimeframe;
+  timeframe?: FlexibleTimeframe;
+}
+
+interface SymbolState {
+  candles: RawCandle[];
+  completed: boolean;
+  error?: boolean;
 }
 
 export async function getCandles({
@@ -303,12 +707,13 @@ export async function getCandles({
             "=" + JSON.stringify({ symbol, adjustment: "splits" }),
           ]);
 
+          const validatedTimeframe = validateTimeframe(timeframe);
           connection.send("modify_series", [
             chartSession,
             "sds_1",
             `s${currentSymIndex}`,
             `sds_sym_${currentSymIndex}`,
-            timeframe.toString(),
+            validatedTimeframe,
             "",
           ]);
           return;
@@ -326,12 +731,13 @@ export async function getCandles({
       `sds_sym_0`,
       "=" + JSON.stringify({ symbol, adjustment: "splits" }),
     ]);
+    const validatedTimeframe = validateTimeframe(timeframe);
     connection.send("create_series", [
       chartSession,
       "sds_1",
       "s0",
       "sds_sym_0",
-      timeframe.toString(),
+      validatedTimeframe,
       batchSize,
       "",
     ]);

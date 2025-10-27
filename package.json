@@ -1,6 +1,7 @@
 {
   "name": "tvws",
-  "version": "0.0.3",
+  "version": "0.0.4",
+  "type": "module",
   "description": "Browser-compatible TradingView WebSocket API with multiple endpoints support",
   "repository": {
     "type": "git",
@@ -23,6 +24,8 @@
   ],
   "scripts": {
     "build": "tsc",
+    "dev": "cd example && bun --hot server.js",
+    "dev-simple": "cd example && bun server.js",
     "prepublishOnly": "npm run typecheck && npm run build",
     "typecheck": "tsc --noEmit"
   },

@@ -1,11 +1,10 @@
 ## Tradingview websockets integration
 Unofficial library to interact with websockets on Tradingview. Now **browser compatible**!
 
-P.S. Check out this awesome trading journal app https://tradinglog.app.
-
 ## Features
 - ✅ **Browser Compatible** - Works in modern browsers with native WebSocket and Fetch APIs
 - ✅ **CDN Ready** - Available via npm CDNs (unpkg, jsDelivr)
+- ✅ **Flexible Timeframe Support** - Supports various formats: "1m", "5m", "1h", "4h", "1D", etc.
 - Realtime data from Tradingview
 - Authorization with session id from cookies
 - Fetching candlesticks for any symbol with any available timeframe
@@ -214,8 +213,54 @@ Options:
 
 * `connection: TradingviewConnection` - connection object
 * `symbols: string[]` - array of symbols. Symbol name can be found on Symbol info modal(click three dots after symbol name on the top left corner of the chart).
-* `timeframe?: number | '1D' | '1W' | '1M'` - candlestick timeframe, default is `60`
+* `timeframe?: string | number` - candlestick timeframe, default is `60`
 * `amount?: number` - amount of candles to fetch. If not present, it will try to fetch as much as possible.
+
+## Timeframe Formats
+
+The library supports flexible timeframe input formats and automatically converts them to TradingView's API requirements:
+
+### Supported Input Formats
+```javascript
+// Intraday timeframes (1m-4h)
+"1m"    // → "1" (1 minute)
+"5m"    // → "5" (5 minutes)
+"15m"   // → "15" (15 minutes)
+"30m"   // → "30" (30 minutes)
+"1h"    // → "60" (1 hour)
+"2h"    // → "120" (2 hours)
+"4h"    // → "240" (4 hours)
+
+// Direct API formats
+"1", "5", "15", "30", "45", "60", "120", "180", "240"
+
+// Daily/Weekly/Monthly
+"1D", "1W", "1M"  // Daily, Weekly, Monthly
+"d", "w", "m"     // Short forms (case insensitive)
+"D", "W", "M"     // Upper case
+```
+
+### Example Usage
+```javascript
+// All these formats work correctly now
+await getCandles({
+  connection,
+  symbols: ['FX:EURUSD'],
+  timeframe: '1h',     // Works: converts to "60"
+});
+
+await getCandles({
+  connection,
+  symbols: ['FX:EURUSD'],
+  timeframe: '4h',     // Works: converts to "240" 
+});
+
+await getCandles({
+  connection,
+  symbols: ['FX:EURUSD'],
+  timeframe: 60,       // Works: numeric input
+});
+```
 
 ### `TradingviewConnection`
 
