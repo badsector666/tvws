@@ -24,8 +24,6 @@
   ],
   "scripts": {
     "build": "tsc",
-    "dev": "cd example && bun --hot server.js",
-    "dev-simple": "cd example && bun server.js",
     "prepublishOnly": "npm run typecheck && npm run build",
     "typecheck": "tsc --noEmit"
   },

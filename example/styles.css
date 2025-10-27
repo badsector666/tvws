@@ -58,18 +58,40 @@ body {
     font-size: 14px;
     line-height: 1.4;
     color: var(--text-primary);
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--bg-secondary);
     min-height: 100vh;
 }
 
 /* Layout Container */
 .container {
-    max-width: 1000px;
-    margin: var(--spacing-xl) auto;
+    width: 100%;
+    margin: 0;
     padding: var(--spacing-lg);
     background: var(--bg-primary);
     box-shadow: var(--shadow-lg);
     border-radius: var(--radius-lg);
+    min-height: 100vh;
+}
+
+/* Main Grid Layout for Compact Design */
+.main-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Two-column layout for forms */
+.two-column-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+/* Compact section card */
+.section-card.compact {
+    padding: var(--spacing-md);
+    margin-bottom: 0;
 }
 
 /* Header Section */
@@ -197,6 +219,17 @@ body {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-md);
+}
+
+/* Compact form row - tighter spacing */
+.form-row.compact {
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Three column layout for compact forms */
+.form-row.three-col {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .form-label {
@@ -347,6 +380,8 @@ select.form-control {
     flex-wrap: wrap;
     justify-content: center;
     margin: var(--spacing-md) 0;
+    position: relative;
+    z-index: 10;
 }
 
 /* Results Section */
@@ -357,6 +392,13 @@ select.form-control {
     margin-bottom: var(--spacing-lg);
     border: 1px solid var(--border-color);
     min-height: 150px;
+}
+
+/* Compact results container */
+.results-container.compact {
+    padding: var(--spacing-md);
+    margin-bottom: 0;
+    min-height: 200px;
 }
 
 .results-container h3 {
@@ -409,6 +451,11 @@ select.form-control {
     border-radius: var(--radius-md);
     padding: var(--spacing-lg);
     border: 1px solid #2d3748;
+}
+
+/* Compact debug log */
+.debug-log.compact {
+    padding: var(--spacing-md);
 }
 
 .debug-log h3 {
@@ -518,7 +565,6 @@ select.form-control {
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
-        margin: var(--spacing-sm);
         padding: var(--spacing-md);
     }
 
@@ -529,6 +575,16 @@ select.form-control {
     .form-row {
         grid-template-columns: 1fr;
         gap: var(--spacing-sm);
+    }
+
+    .two-column-layout {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .main-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
     }
 
     .button-group {
@@ -544,7 +600,6 @@ select.form-control {
 
 @media (max-width: 480px) {
     .container {
-        margin: var(--spacing-xs);
         padding: var(--spacing-sm);
     }
 
@@ -576,6 +631,27 @@ input[type="submit"] {
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     appearance: none !important;
+    position: relative;
+    z-index: 100 !important;
+    touch-action: manipulation !important;
+    user-select: none !important;
+}
+
+/* Ensure checkbox is clickable */
+input[type="checkbox"] {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 100 !important;
+    touch-action: manipulation !important;
+    cursor: pointer !important;
+}
+
+/* Ensure labels are clickable */
+label {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    position: relative;
+    z-index: 10 !important;
 }
 
 /* Prevent overlapping elements */

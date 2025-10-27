@@ -1,6 +1,9 @@
 // TradingView WebSocket Example - Complete Functionality
-// For development: using local build from dist folder
+// For development: using local build from dist folder (when serving from root)
 import { connect, getCandles, ENDPOINTS } from "../dist/index.js";
+
+// Alternative: If serving from root directory, use:
+// import { connect, getCandles, ENDPOINTS } from "/dist/index.js";
 
 // For production (after NPM publishing), you can use CDN instead:
 // import { connect, getCandles, ENDPOINTS } from "https://unpkg.com/tvws@latest/dist/index.js";
@@ -10,29 +13,163 @@ let connection = null;
 // Initialize all functions to make them available globally
 console.log("Initializing TradingView WebSocket example...");
 
-// Authentication helper functions
-window.toggleAuthFields = function () {
-  console.log("toggleAuthFields called");
-  const authToggle = document.getElementById("authToggle");
-  const authFields = document.getElementById("authFields");
+// Set up global functions immediately, don't wait for DOM
+console.log("Setting up global functions immediately");
+setupGlobalFunctions();
 
-  if (authToggle.checked) {
-    authFields.style.display = "block";
-    log("Authentication enabled - please enter your session ID", "info");
-  } else {
-    authFields.style.display = "none";
-    hideAuthStatus();
-    log("Authentication disabled - will use unauthorized access", "info");
+// Wait for DOM to be ready before setting up event listeners
+document.addEventListener("DOMContentLoaded", function () {
+  console.log("DOM Content Loaded - Setting up event listeners");
+  initializeEventListeners();
+  initializeLogging();
+  log("TradingView WebSocket Example initialized successfully!", "success");
+});
+
+// Function to set up all global functions
+function setupGlobalFunctions() {
+  try {
+    // Make all functions globally available to HTML onclick handlers
+    window.toggleAuthFields = function () {
+      console.log("toggleAuthFields called via window");
+      return toggleAuthFields();
+    };
+
+    window.showSessionHelp = function () {
+      console.log("showSessionHelp called via window");
+      return showSessionHelp();
+    };
+
+    window.hideSessionHelp = function () {
+      console.log("hideSessionHelp called via window");
+      return hideSessionHelp();
+    };
+
+    window.quickConnect = function () {
+      console.log("quickConnect called via window");
+      return quickConnect();
+    };
+
+    window.testConnection = function () {
+      console.log("testConnection called via window");
+      return testConnection();
+    };
+
+    window.loadData = function () {
+      console.log("loadData called via window");
+      return loadData();
+    };
+
+    window.clearResults = function () {
+      console.log("clearResults called via window");
+      return clearResults();
+    };
+
+    window.clearLog = function () {
+      console.log("clearLog called via window");
+      return clearLog();
+    };
+
+    window.selectPresetTicker = function () {
+      console.log("selectPresetTicker called via window");
+      return selectPresetTicker();
+    };
+
+    window.resetQueryForm = function () {
+      console.log("resetQueryForm called via window");
+      return resetQueryForm();
+    };
+
+    window.log = log;
+
+    console.log("All global functions have been set up successfully");
+
+    // Test that functions are accessible
+    console.log("Testing function accessibility:");
+    console.log(
+      "- toggleAuthFields available:",
+      typeof window.toggleAuthFields,
+    );
+    console.log("- quickConnect available:", typeof window.quickConnect);
+    console.log("- loadData available:", typeof window.loadData);
+  } catch (error) {
+    console.error("Error setting up global functions:", error);
   }
-};
+}
 
-window.showSessionHelp = function () {
-  document.getElementById("sessionHelp").style.display = "block";
-};
+// Initialize event listeners
+function initializeEventListeners() {
+  // Only add event listeners for elements that don't have onclick handlers
+  const endpointSelect = document.getElementById("endpointSelect");
+  if (endpointSelect) {
+    endpointSelect.addEventListener("change", function () {
+      log("Selected endpoint: " + this.value, "info");
+    });
+  }
 
-window.hideSessionHelp = function () {
-  document.getElementById("sessionHelp").style.display = "none";
-};
+  console.log("Event listeners initialized");
+}
+
+// Authentication helper functions
+function toggleAuthFields() {
+  try {
+    console.log("toggleAuthFields called");
+    
+    // Wait for DOM if needed
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', toggleAuthFields);
+      return;
+    }
+    
+    const authToggle = document.getElementById("authToggle");
+    const authFields = document.getElementById("authFields");
+
+    if (!authToggle || !authFields) {
+      console.error("Required elements not found:", { authToggle, authFields });
+      log("Error: Authentication elements not found", "error");
+      return;
+    }
+
+    if (authToggle.checked) {
+      authFields.style.display = "block";
+      log("Authentication enabled - please enter your session ID", "info");
+    } else {
+      authFields.style.display = "none";
+      hideAuthStatus();
+      log("Authentication disabled - will use unauthorized access", "info");
+    }
+  } catch (error) {
+    console.error("Error in toggleAuthFields:", error);
+    log("Error toggling authentication fields", "error");
+  }
+}
+
+function showSessionHelp() {
+  try {
+    const sessionHelp = document.getElementById("sessionHelp");
+    if (sessionHelp) {
+      sessionHelp.style.display = "block";
+      console.log("Session help shown");
+    } else {
+      console.error("Session help element not found");
+    }
+  } catch (error) {
+    console.error("Error showing session help:", error);
+  }
+}
+
+function hideSessionHelp() {
+  try {
+    const sessionHelp = document.getElementById("sessionHelp");
+    if (sessionHelp) {
+      sessionHelp.style.display = "none";
+      console.log("Session help hidden");
+    } else {
+      console.error("Session help element not found");
+    }
+  } catch (error) {
+    console.error("Error hiding session help:", error);
+  }
+}
 
 function showAuthStatus(message, type) {
   const authStatus = document.getElementById("authStatus");
@@ -119,8 +256,15 @@ window.quickConnect = async function () {
 };
 
 // Make functions globally available
-window.testConnection = async function () {
+async function testConnection() {
   console.log("testConnection called");
+  
+  // Wait for DOM if needed
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', testConnection);
+    return;
+  }
+  
   const connectBtn = document.getElementById("connectBtn");
   const candlesBtn = document.getElementById("candlesBtn");
   const selectedEndpoint = document.getElementById("endpointSelect").value;
@@ -197,9 +341,9 @@ window.testConnection = async function () {
     connectBtn.disabled = false;
     connectBtn.textContent = "Connect to TradingView";
   }
-};
+}
 
-window.loadData = async function () {
+async function loadData() {
   if (!connection) {
     log("❌ No active connection. Please connect first.", "error");
     return;
@@ -372,7 +516,7 @@ window.loadData = async function () {
     log("=== Data Fetch Completed ===", "info");
     log("🔄 You can try different settings and fetch again", "info");
   }
-};
+}
 
 // Helper function to get readable timeframe text
 function getTimeframeText(timeframe) {
@@ -434,34 +578,52 @@ function validateSymbolTimeframe(ticker, timeframe, endpoint) {
   return { issues, suggestions };
 }
 
-window.clearResults = function () {
+function clearResults() {
+  // Wait for DOM if needed
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', clearResults);
+    return;
+  }
+  
   document.getElementById("results").style.display = "none";
   document.getElementById("candleData").innerHTML = "";
   updateStatus("Results cleared.", "info");
   log("Results cleared", "info");
-};
+}
 
-window.clearLog = function () {
+function clearLog() {
+  // Wait for DOM if needed
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', clearLog);
+    return;
+  }
+  
   document.getElementById("log").textContent = "";
-};
+}
 
 // New functions for custom K-Line query interface
-window.selectPresetTicker = function () {
+function selectPresetTicker() {
   const preset = document.getElementById("tickerPreset").value;
   if (preset) {
     document.getElementById("tickerInput").value = preset;
     log(`Selected preset ticker: ${preset}`, "info");
   }
-};
+}
 
-window.resetQueryForm = function () {
+function resetQueryForm() {
+  // Wait for DOM if needed
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', resetQueryForm);
+    return;
+  }
+  
   document.getElementById("tickerInput").value = "FX:EURUSD";
   document.getElementById("tickerPreset").value = "";
   document.getElementById("timeframeSelect").value = "1D";
   document.getElementById("amountInput").value = "10";
   document.getElementById("extendedDataCheck").checked = false;
   log("Query form reset to default values", "info");
-};
+}
 
 function updateStatus(message, type = "info") {
   // Hide all status alerts first
@@ -493,154 +655,49 @@ function log(message, type = "info") {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-// Make log function globally available for HTML handlers
-window.log = log;
-
-// Initialize
-log("TradingView WebSocket Example loaded", "success");
-log("Package: tvws (Browser Compatible)", "info");
-log("Imported from: ../src/index.js", "info");
-log("Ready to connect!", "success");
-log("", "info");
-log("=== Instructions ===", "info");
-log("🚀 QUICK START:", "info");
-log('1. Click "🚀 Quick Connect (No Auth)" - bypasses all settings', "info");
-log("2. Configure your K-Line query below", "info");
-log('3. Click "📊 Get K-Line Data" once connected', "info");
-log("", "info");
-log("=== Advanced Options ===", "info");
-log("1. Select a WebSocket endpoint (recommended: data)", "info");
-log("2. Optional: Enable authentication and enter your session ID", "info");
-log('3. Click "Connect to TradingView"', "info");
-log("4. Configure your query parameters in the form below", "info");
-log('5. Click "📊 Get K-Line Data" once connected', "info");
-log("", "info");
-log("📊 K-Line Query Features:", "info");
-log("- Custom ticker symbols (e.g., BINANCE:BTCUSDT.P, FX:EURUSD)", "info");
-log("- Multiple timeframes: 1m to 1M", "info");
-log("- Adjustable number of candles (1-500)", "info");
-log("- Quick selection from popular tickers", "info");
-log("- Extended data option (VWAP, trades)", "info");
-log("- Price statistics and change calculations", "info");
-log("", "info");
-log("💡 Tips:", "info");
-log("- Use Quick Connect for fastest connection testing", "info");
-log("- The system will automatically try fallback endpoints", "info");
-log(
-  "- Authentication provides access to premium data but may fail due to CORS",
-  "info",
-);
-log("- If anything fails, try Quick Connect first", "info");
-log("- Try different timeframes if data is unavailable", "info");
-log("- Some symbols may require specific endpoints", "info");
-log("", "info");
-log("🔍 Popular Ticker Formats:", "info");
-log("- Crypto: BINANCE:BTCUSDT.P, CRYPTO:BTCUSD", "info");
-log("- Forex: FX:EURUSD, FX:GBPUSD", "info");
-log("- Stocks: NASDAQ:AAPL, NYSE:TSLA", "info");
-log("- Indices: INDEX:SPX, INDEX:DJI", "info");
-log("", "info");
-
-// Script is at end of body, DOM is ready
-console.log("Setting up event listeners...");
-
-// Authentication toggle
-const authToggle = document.getElementById("authToggle");
-if (authToggle) {
-  authToggle.addEventListener("change", function () {
-    console.log("Auth toggle changed");
-    toggleAuthFields();
-  });
+// Function to initialize logging when DOM is ready
+function initializeLogging() {
+  log("TradingView WebSocket Example loaded", "success");
+  log("Package: tvws (Browser Compatible)", "info");
+  log("Imported from: ../dist/index.js", "info");
+  log("Ready to connect!", "success");
+  log("", "info");
+  log("=== Instructions ===", "info");
+  log("🚀 QUICK START:", "info");
+  log('1. Click "🚀 Quick Connect" - bypasses all settings', "info");
+  log("2. Configure your K-Line query below", "info");
+  log('3. Click "📊 Get K-Line Data" once connected', "info");
+  log("", "info");
+  log("=== Advanced Options ===", "info");
+  log("1. Select a WebSocket endpoint (recommended: data)", "info");
+  log("2. Optional: Enable authentication and enter your session ID", "info");
+  log('3. Click "Connect to TradingView"', "info");
+  log("4. Configure your query parameters in the form below", "info");
+  log('5. Click "📊 Get K-Line Data" once connected', "info");
+  log("", "info");
+  log("📊 K-Line Query Features:", "info");
+  log("- Custom ticker symbols (e.g., BINANCE:BTCUSDT.P, FX:EURUSD)", "info");
+  log("- Multiple timeframes: 1m to 1M", "info");
+  log("- Adjustable number of candles (1-500)", "info");
+  log("- Quick selection from popular tickers", "info");
+  log("- Extended data option (VWAP, trades)", "info");
+  log("- Price statistics and change calculations", "info");
+  log("", "info");
+  log("💡 Tips:", "info");
+  log("- Use Quick Connect for fastest connection testing", "info");
+  log("- The system will automatically try fallback endpoints", "info");
+  log(
+    "- Authentication provides access to premium data but may fail due to CORS",
+    "info",
+  );
+  log("- If anything fails, try Quick Connect first", "info");
+  log("- Try different timeframes if data is unavailable", "info");
+  log("- Some symbols may require specific endpoints", "info");
+  log("", "info");
+  log("🔍 Popular Ticker Formats:", "info");
+  log("- Crypto: BINANCE:BTCUSDT.P, CRYPTO:BTCUSD", "info");
+  log("- Forex: FX:EURUSD, FX:GBPUSD", "info");
+  log("- Stocks: NASDAQ:AAPL, NYSE:TSLA", "info");
+  log("- Indices: INDEX:SPX, INDEX:DJI", "info");
+  log("", "info");
 }
-
-// Connection buttons
-const connectBtn = document.getElementById("connectBtn");
-console.log("connectBtn found:", !!connectBtn);
-if (connectBtn) {
-  // Try multiple approaches to ensure the event works
-  connectBtn.addEventListener("click", function (e) {
-    console.log("Connect button clicked via addEventListener");
-    e.preventDefault();
-    testConnection();
-  });
-
-  // Also try onclick as backup
-  connectBtn.onclick = function (e) {
-    console.log("Connect button clicked via onclick");
-    e.preventDefault();
-    testConnection();
-  };
-
-  console.log("Event listeners attached to connect button");
-}
-
-const clearBtn = document.getElementById("clearBtn");
-if (clearBtn) {
-  clearBtn.addEventListener("click", clearResults);
-}
-
-const clearLogBtn = document.getElementById("clearLogBtn");
-if (clearLogBtn) {
-  clearLogBtn.addEventListener("click", clearLog);
-}
-
-// Session help buttons - find by ID or nearby text
-const showSessionHelpBtn = Array.from(document.querySelectorAll("button")).find(
-  (btn) => btn.textContent.includes("?"),
-);
-const hideSessionHelpBtn = Array.from(document.querySelectorAll("button")).find(
-  (btn) =>
-    btn.textContent.includes("Close") && btn.textContent.includes("Help"),
-);
-
-if (showSessionHelpBtn) {
-  showSessionHelpBtn.onclick = showSessionHelp;
-}
-if (hideSessionHelpBtn) {
-  hideSessionHelpBtn.onclick = hideSessionHelp;
-}
-
-// Quick connect
-const quickConnectBtn = document.getElementById("quickConnectBtn");
-console.log("quickConnectBtn found:", !!quickConnectBtn);
-if (quickConnectBtn) {
-  quickConnectBtn.addEventListener("click", function () {
-    console.log("Quick connect button clicked");
-    quickConnect();
-  });
-}
-
-// Data loading buttons
-const loadDataBtn = document.getElementById("candlesBtn");
-console.log("loadDataBtn found:", !!loadDataBtn);
-if (loadDataBtn) {
-  loadDataBtn.addEventListener("click", function () {
-    console.log("Load data button clicked");
-    loadData();
-  });
-}
-
-const resetQueryBtn = document.getElementById("resetQueryBtn");
-console.log("resetQueryBtn found:", !!resetQueryBtn);
-if (resetQueryBtn) {
-  resetQueryBtn.addEventListener("click", function () {
-    console.log("Reset query button clicked");
-    resetQueryForm();
-  });
-}
-
-// Endpoint selector
-const endpointSelect = document.getElementById("endpointSelect");
-if (endpointSelect) {
-  endpointSelect.addEventListener("change", function () {
-    log("Selected endpoint: " + this.value, "info");
-  });
-}
-
-// Preset selectors
-const tickerPreset = document.getElementById("tickerPreset");
-if (tickerPreset) {
-  tickerPreset.addEventListener("change", selectPresetTicker);
-}
-
-console.log("Event listeners setup complete");

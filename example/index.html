@@ -4,7 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>TradingView WebSocket Example - tvws</title>
-        <link rel="stylesheet" href="styles.css" />
+        <link rel="stylesheet" href="./styles.css" />
     </head>
     <body>
         <div class="container">
@@ -40,94 +40,112 @@
                 </div>
             </div>
 
-            <!-- Authentication Section -->
-            <div class="section-card auth-section">
-                <h3>🔐 Authentication (Optional)</h3>
-                <div class="form-group">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="authToggle" />
-                        <label for="authToggle">Enable Authentication</label>
-                    </div>
-                </div>
-                <div id="authFields" style="display: none">
+            <!-- Authentication & Controls - Two Column Layout -->
+            <div class="two-column-layout">
+                <!-- Authentication Section -->
+                <div class="section-card auth-section compact">
+                    <h3>🔐 Authentication (Optional)</h3>
                     <div class="form-group">
-                        <label for="sessionId" class="form-label"
-                            >Session ID:</label
-                        >
-                        <input
-                            type="text"
-                            id="sessionId"
-                            class="form-control"
-                            placeholder="e.g. qsxh1x2yz9i4x8x2..."
-                        />
+                        <div class="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="authToggle"
+                                onchange="toggleAuthFields()"
+                            />
+                            <label for="authToggle"
+                                >Enable Authentication</label
+                            >
+                        </div>
                     </div>
-                    <div class="form-group">
+                    <div id="authFields" style="display: none">
+                        <div class="form-group">
+                            <label for="sessionId" class="form-label"
+                                >Session ID:</label
+                            >
+                            <input
+                                type="text"
+                                id="sessionId"
+                                class="form-control"
+                                placeholder="e.g. qsxh1x2yz9i4x8x2..."
+                            />
+                        </div>
+                        <div class="form-group">
+                            <button
+                                type="button"
+                                class="btn btn-outline"
+                                onclick="showSessionHelp()"
+                            >
+                                ❓ Help
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        id="sessionHelp"
+                        class="session-help"
+                        style="display: none"
+                    >
+                        <h4>How to get Session ID:</h4>
+                        <ol>
+                            <li>
+                                <a
+                                    href="https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT"
+                                    target="_blank"
+                                    >Open TradingView</a
+                                >
+                            </li>
+                            <li>Open browser dev tools (F12)</li>
+                            <li>
+                                Go to Application tab → Cookies →
+                                tradingview.com
+                            </li>
+                            <li>Find 'sessionid' cookie value</li>
+                            <li>Copy the entire value (it's long!)</li>
+                            <li>Paste in the session field above</li>
+                        </ol>
                         <button
                             type="button"
-                            class="btn btn-outline"
-                            onclick="showSessionHelp()"
+                            class="btn btn-secondary"
+                            onclick="hideSessionHelp()"
                         >
-                            ❓ Help
+                            Close Help
                         </button>
                     </div>
+                    <div id="authStatus" class="auth-status"></div>
                 </div>
-                <div
-                    id="sessionHelp"
-                    class="session-help"
-                    style="display: none"
-                >
-                    <h4>How to get Session ID:</h4>
-                    <ol>
-                        <li>
-                            <a
-                                href="https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT"
-                                target="_blank"
-                                >Open TradingView</a
-                            >
-                        </li>
-                        <li>Open browser dev tools (F12)</li>
-                        <li>
-                            Go to Application tab → Cookies → tradingview.com
-                        </li>
-                        <li>Find 'sessionid' cookie value</li>
-                        <li>Copy the entire value (it's long!)</li>
-                        <li>Paste in the session field above</li>
-                    </ol>
-                    <button
-                        type="button"
-                        class="btn btn-secondary"
-                        onclick="hideSessionHelp()"
-                    >
-                        Close Help
-                    </button>
-                </div>
-                <div id="authStatus" class="auth-status"></div>
-            </div>
 
-            <!-- Control Buttons -->
-            <div class="section-card controls-section">
-                <h3>⚡ Connection Controls</h3>
-                <div class="button-group">
-                    <button
-                        id="quickConnectBtn"
-                        class="btn btn-success"
-                        onclick="quickConnect()"
-                    >
-                        🚀 Quick Connect
-                    </button>
-                    <button
-                        id="connectBtn"
-                        class="btn btn-primary"
-                        onclick="testConnection()"
-                    >
-                        🔗 Connect to TradingView
-                    </button>
-                    <button class="btn btn-secondary" onclick="clearResults()">
-                        🗑️ Clear Results
-                    </button>
-                    <button class="btn btn-secondary" onclick="clearLog()">
-                        📋 Clear Log
-                    </button>
+                <!-- Control Buttons -->
+                <div class="section-card controls-section compact">
+                    <h3>⚡ Connection Controls</h3>
+                    <div class="button-group">
+                        <button
+                            id="quickConnectBtn"
+                            class="btn btn-success"
+                            onclick="quickConnect()"
+                        >
+                            🚀 Quick Connect
+                        </button>
+                        <button
+                            id="connectBtn"
+                            class="btn btn-primary"
+                            onclick="testConnection()"
+                        >
+                            🔗 Connect to TradingView
+                        </button>
+                        <button
+                            id="clearBtn"
+                            class="btn btn-secondary"
+                            onclick="clearResults()"
+                        >
+                            🗑️ Clear Results
+                        </button>
+                        <button
+                            id="clearLogBtn"
+                            class="btn btn-secondary"
+                            onclick="clearLog()"
+                        >
+                            📋 Clear Log
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -278,20 +296,27 @@
                 </div>
             </div>
 
-            <!-- Results Display -->
-            <div id="results" class="results-container" style="display: none">
-                <h3>📈 K-Line Data Results</h3>
-                <div id="queryInfo" class="query-info"></div>
-                <div id="candleData" class="candle-list"></div>
-            </div>
+            <!-- Results & Debug Log - Two Column Layout -->
+            <div class="two-column-layout">
+                <!-- Results Display -->
+                <div
+                    id="results"
+                    class="results-container compact"
+                    style="display: none"
+                >
+                    <h3 id="resultsTitle">📈 K-Line Data Results</h3>
+                    <div id="queryInfo" class="query-info"></div>
+                    <div id="candleData" class="candle-list"></div>
+                </div>
 
-            <!-- Debug Log -->
-            <div class="debug-log">
-                <h3>📋 Debug Log</h3>
-                <div id="log" class="log-container"></div>
+                <!-- Debug Log -->
+                <div class="debug-log compact">
+                    <h3>📋 Debug Log</h3>
+                    <div id="log" class="log-container"></div>
+                </div>
             </div>
         </div>
 
-        <script type="module" src="script.js"></script>
+        <script type="module" src="./script.js"></script>
     </body>
 </html>
