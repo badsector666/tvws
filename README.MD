@@ -1,15 +1,18 @@
-## Tradingview websockets integration
-Unofficial library to interact with websockets on Tradingview. Now **browser compatible**!
+# TVWS - TradingView WebSocket Library
 
-## Features
+Browser-compatible TradingView WebSocket API with multiple endpoints and real-time data support.
+
+## 🚀 Features
+
 - ✅ **Browser Compatible** - Works in modern browsers with native WebSocket and Fetch APIs
 - ✅ **CDN Ready** - Available via npm CDNs (unpkg, jsDelivr)
-- ✅ **Flexible Timeframe Support** - Supports various formats: "1m", "5m", "1h", "4h", "1D", etc.
-- Realtime data from Tradingview
-- Authorization with session id from cookies
-- Fetching candlesticks for any symbol with any available timeframe
+- ✅ **Multiple Endpoints** - Support for different TradingView WebSocket endpoints
+- ✅ **Flexible Timeframes** - Supports various formats: "1m", "5m", "1h", "4h", "1D", etc.
+- ✅ **Real-time Data** - Subscribe to live market data updates
+- ✅ **Authentication Support** - Optional session-based authentication
+- ✅ **Complete Web Interface** - Full-featured example with responsive design
 
-## Installation
+## 📦 Installation
 
 ### NPM
 ```bash
@@ -20,286 +23,314 @@ npm install tvws
 ```html
 <!-- Using unpkg -->
 <script type="module">
-import { connect, getCandles } from 'https://unpkg.com/tvws@latest/dist/index.js';
+import { connect, getCandles, ENDPOINTS } from 'https://unpkg.com/tvws@latest/dist/index.js';
 </script>
 
 <!-- Using jsDelivr -->
 <script type="module">
-import { connect, getCandles } from 'https://cdn.jsdelivr.net/npm/tvws@latest/dist/index.js';
+import { connect, getCandles, ENDPOINTS } from 'https://cdn.jsdelivr.net/npm/tvws@latest/dist/index.js';
 </script>
 ```
 
-## Examples
+## 🎯 Quick Start
 
-### Node.js
-```ts
-import { connect, getCandles } from 'tvws'
-
-(async function() {
-  const connection = await connect()
-  const candles = await getCandles({
-    connection,
-    symbols: ['FX:AUDCAD', 'FX:AUDCHF'],
-    amount: 10_000,
-    timeframe: 60
-  })
-  await connection.close()
-  console.log(`Candles for AUDCAD:`, candles[0])
-  console.log(`Candles for AUDCHF:`, candles[1])
-}());
-```
-
-### Browser (HTML)
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>TradingView WebSocket Example</title>
-</head>
-<body>
-    <div id="app">
-        <h1>TradingView Data</h1>
-        <button onclick="loadData()">Load EUR/USD Data</button>
-        <div id="results"></div>
-    </div>
-
-    <script type="module">
-        import { connect, getCandles } from 'https://unpkg.com/tvws@latest/dist/index.js';
-
-        window.loadData = async function() {
-            try {
-                const connection = await connect();
-                const candles = await getCandles({
-                    connection,
-                    symbols: ['FX:EURUSD'],
-                    amount: 10,
-                    timeframe: '1D'
-                });
-
-                const resultsDiv = document.getElementById('results');
-                resultsDiv.innerHTML = candles[0].map(candle =>
-                    `<div>Date: ${new Date(candle.timestamp * 1000).toLocaleDateString()},
-                     Close: ${candle.close.toFixed(5)}</div>`
-                ).join('');
-
-                await connection.close();
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        };
-    </script>
-</body>
-</html>
-```
-
-### Browser with Authentication
+### Basic Usage
 ```javascript
-// Note: Authentication may not work in browsers due to CORS restrictions
-// You might need to manually provide session tokens
+import { connect, getCandles } from 'tvws';
 
-import { connect, getCandles } from 'https://unpkg.com/tvws@latest/dist/index.js';
+// Connect to TradingView
+const connection = await connect();
 
-async function getAuthenticatedData() {
-    try {
-        const connection = await connect({
-            sessionId: 'your_session_id_here' // From TradingView cookies
-        });
+// Fetch candlestick data
+const candles = await getCandles({
+  connection,
+  symbols: ['FX:EURUSD'],
+  amount: 10,
+  timeframe: '1D'
+});
 
-        const candles = await getCandles({
-            connection,
-            symbols: ['NASDAQ:AAPL'],
-            amount: 20,
-            timeframe: '1D'
-        });
-
-        console.log('AAPL candles:', candles);
-        await connection.close();
-    } catch (error) {
-        console.error('Authentication failed:', error);
-        // Fall back to unauthorized connection if needed
-    }
-}
+console.log('Candles:', candles);
+await connection.close();
 ```
 
-### Different Endpoints
+### With Authentication
 ```javascript
-import { connect, getCandles, ENDPOINTS } from 'tvws';
+import { connect, getCandles } from 'tvws';
 
-// Using different endpoints for different user types
-async function exampleEndpoints() {
-    // Free users (default)
-    const freeConnection = await connect(); // Uses "data" endpoint automatically
+const connection = await connect({
+  sessionId: 'your_session_id_here' // From TradingView cookies
+});
 
-    // Premium users
-    const premiumConnection = await connect({
-        endpoint: 'prodata'
-    });
+const candles = await getCandles({
+  connection,
+  symbols: ['NASDAQ:AAPL'],
+  amount: 20,
+  timeframe: '1h'
+});
 
-    // Widget data
-    const widgetConnection = await connect({
-        endpoint: 'widgetdata'
-    });
-
-    // Custom endpoint
-    const customConnection = await connect({
-        endpoint: 'wss://your-custom-endpoint.com/socket.io/websocket'
-    });
-
-    // Using predefined endpoint URLs
-    console.log('Available endpoints:', ENDPOINTS);
-
-    try {
-        const candles = await getCandles({
-            connection: freeConnection,
-            symbols: ['FX:EURUSD'],
-            amount: 10,
-            timeframe: '1D'
-        });
-        console.log('Free user data:', candles);
-        await freeConnection.close();
-    } catch (error) {
-        console.error('Connection failed:', error);
-    }
-}
+console.log('AAPL candles:', candles);
+await connection.close();
 ```
 
-### Browser Example with Different Endpoints
-```html
-<script type="module">
-import { connect, getCandles, ENDPOINTS } from 'https://unpkg.com/tvws@latest/dist/index.js';
+## 🌐 Live Example
 
-// Connect using different endpoints based on user type
-async function connectToTradingview(userType = 'free') {
-    const endpointMap = {
-        'free': 'data',
-        'premium': 'prodata',
-        'widget': 'widgetdata'
-    };
+The library includes a complete, production-ready web interface in the `example/` folder that now uses CDN for easy deployment:
 
-    const connection = await connect({
-        endpoint: endpointMap[userType] || 'data'
-    });
+### Features
+- **CDN-Powered** - Uses npm CDN for hassle-free setup without local builds
+- **Multi-endpoint Support** - Switch between data, prodata, widgetdata endpoints
+- **Authentication UI** - Optional session-based authentication with help guide
+- **Real-time Connection Status** - Live connection monitoring and debugging
+- **Symbol Selection** - Quick presets for popular crypto, forex, and stock symbols
+- **Flexible Timeframes** - Support for all TradingView timeframes
+- **Data Visualization** - Clean display of OHLCV data with statistics
+- **Extended Data** - Optional VWAP and trade volume information
+- **Debug Logging** - Comprehensive logging for troubleshooting
 
-    return connection;
-}
-</script>
+### Running the Example
+```bash
+# Clone the repository
+git clone https://github.com/badsector666/tvws.git
+cd tvws
+
+# Serve the example directly (no build required for CDN version)
+npx serve example/
+# or
+python -m http.server 8000 --directory example
+# then open http://localhost:8000
 ```
 
-## API
+**Note:** The example now uses CDN by default, so you can serve the `example/` folder directly without building the library first.
 
-### `connect(options: ConnectionOptions = {}): Promise<TradingviewConnection>`
+### Example Interface
+The web example provides:
+- **Quick Connect** - One-click connection with optimal settings
+- **Endpoint Selection** - Choose between available TradingView endpoints
+- **Authentication Options** - Optional session ID input with instructions
+- **Query Configuration** - Symbol, timeframe, and amount selection
+- **Results Display** - Formatted candlestick data with price statistics
+- **Debug Console** - Real-time logging for troubleshooting
 
-Creates new connection to tradingview websockets. Returns `TradingviewConnection`.
+## 📊 Supported Data
 
-Options:
-
-* `sessionId?: string` - authorize connection if present. Can be received from cookies.
-  - **Note**: Due to browser CORS restrictions, authentication may not work in browsers.
-  - Consider using a server proxy for authentication if needed.
-* `endpoint?: string | TradingviewEndpoint` - WebSocket endpoint to connect to.
-  - Default: `"data"` (for free users)
-  - Available endpoints:
-    - `"data"` - `wss://data.tradingview.com/socket.io/websocket` (default, free users)
-    - `"prodata"` - `wss://prodata.tradingview.com/socket.io/websocket` (premium users)
-    - `"widgetdata"` - `wss://widgetdata.tradingview.com/socket.io/websocket` (widget data)
-    - `"charts-polygon"` - `wss://charts-polygon.tradingview.com/socket.io/websocket` (polygon data)
-  - Custom WebSocket URLs are also supported (must start with `wss://`)
-
-### `getCandles({ connection, symbols, amount, timeframe = 60 }: GetCandlesParams)`
-
-Fetches all available candles for symbols. The maximum amount is around 13_000 candles for the hourly timeframe. Returns an array where each element is an array of candles for one symbol in the order it passed to the function.
-
-Options:
-
-* `connection: TradingviewConnection` - connection object
-* `symbols: string[]` - array of symbols. Symbol name can be found on Symbol info modal(click three dots after symbol name on the top left corner of the chart).
-* `timeframe?: string | number` - candlestick timeframe, default is `60`
-* `amount?: number` - amount of candles to fetch. If not present, it will try to fetch as much as possible.
-
-## Timeframe Formats
-
-The library supports flexible timeframe input formats and automatically converts them to TradingView's API requirements:
-
-### Supported Input Formats
+### Symbol Formats
 ```javascript
-// Intraday timeframes (1m-4h)
-"1m"    // → "1" (1 minute)
-"5m"    // → "5" (5 minutes)
-"15m"   // → "15" (15 minutes)
-"30m"   // → "30" (30 minutes)
-"1h"    // → "60" (1 hour)
-"2h"    // → "120" (2 hours)
-"4h"    // → "240" (4 hours)
+// Forex
+'FX:EURUSD', 'FX:GBPUSD', 'FX:USDJPY'
 
-// Direct API formats
-"1", "5", "15", "30", "45", "60", "120", "180", "240"
+// Crypto
+'CRYPTO:BTCUSD', 'BINANCE:BTCUSDT.P', 'BINANCE:ETHUSDT.P'
+
+// Stocks
+'NASDAQ:AAPL', 'NASDAQ:TSLA', 'NYSE:GME'
+
+// Custom brokers
+'OANDA:EUR_USD', 'POLYGON:BTCUSD'
+```
+
+### Timeframe Formats
+```javascript
+// Intraday (supports all common timeframes)
+'1m', '3m', '5m', '15m', '30m', '45m'  // Minutes
+'1h', '2h', '3h', '4h', '8h', '12h'   // Hours
 
 // Daily/Weekly/Monthly
-"1D", "1W", "1M"  // Daily, Weekly, Monthly
-"d", "w", "m"     // Short forms (case insensitive)
-"D", "W", "M"     // Upper case
+'1D', '1W', '1M'
+
+// Direct API values
+1, 5, 15, 30, 60, 240, 'D', 'W', 'M'
 ```
 
-### Example Usage
+### Response Data
+Each candle includes:
 ```javascript
-// All these formats work correctly now
-await getCandles({
-  connection,
-  symbols: ['FX:EURUSD'],
-  timeframe: '1h',     // Works: converts to "60"
-});
-
-await getCandles({
-  connection,
-  symbols: ['FX:EURUSD'],
-  timeframe: '4h',     // Works: converts to "240" 
-});
-
-await getCandles({
-  connection,
-  symbols: ['FX:EURUSD'],
-  timeframe: 60,       // Works: numeric input
-});
+{
+  timestamp: 1640995200,  // Unix timestamp
+  open: 1.13500,         // Open price
+  high: 1.13750,         // High price
+  low: 1.13400,          // Low price
+  close: 1.13650,        // Close price
+  volume: 1250,          // Trading volume
+  vwap: 1.13580,         // Volume Weighted Average Price (optional)
+  trades: 450            // Number of trades (optional)
+}
 ```
+
+## 🔧 API Reference
+
+### `connect(options?: ConnectionOptions): Promise<TradingviewConnection>`
+
+Creates a new connection to TradingView WebSocket endpoints.
+
+**Options:**
+- `sessionId?: string` - Optional authentication token from TradingView cookies
+- `endpoint?: string | TradingviewEndpoint` - WebSocket endpoint selection
+
+**Endpoints:**
+- `"data"` - Free user data (default)
+- `"prodata"` - Premium user data
+- `"widgetdata"` - Widget-specific data
+- `"charts-polygon"` - Polygon.io chart data
+- Custom WebSocket URLs (must start with `wss://`)
+
+### `getCandles(params: GetCandlesParams): Promise<CandleData[]>`
+
+Fetches historical candlestick data for specified symbols.
+
+**Parameters:**
+- `connection: TradingviewConnection` - Active connection instance
+- `symbols: string[]` - Array of trading symbols
+- `amount?: number` - Number of candles to fetch (1-500, default: maximum available)
+- `timeframe?: string | number` - Chart timeframe (default: "1D")
+
+**Returns:** Array of candle arrays, one per symbol in the order provided
 
 ### `TradingviewConnection`
 
-Connection object. Can be used directly to receive and send data to websockets.
+Connection object with real-time capabilities:
 
-Methods:
+**Methods:**
+- `subscribe(handler: Subscriber): Unsubscriber` - Subscribe to WebSocket events
+- `send(name: string, params: any[]): void` - Send commands to WebSocket
+- `close(): Promise<void>` - Close the connection
 
-* `subscribe: (handler: Subscriber) => Unsubscriber` - subscribe to websockets events
-* `send: (name: string, params: any[]) => void` - send command to websockets
-* `close: () => Promise<void>` - close the connection
+**Example:**
+```javascript
+const connection = await connect();
 
-## Browser Compatibility
+// Subscribe to real-time events
+const unsubscribe = connection.subscribe((event) => {
+  console.log('Real-time event:', event.name, event.data);
+});
 
-### ✅ Supported Features
-- Native WebSocket API (no polyfills needed)
-- Fetch API for authentication (when CORS allows)
+// Send custom commands
+connection.send('chart_create_session', ['session_id']);
+
+// Clean up
+await connection.close();
+```
+
+## 🔐 Authentication
+
+### Getting Session ID
+1. Open [TradingView](https://www.tradingview.com/chart/) in your browser
+2. Open Developer Tools (F12)
+3. Go to Application tab → Cookies → tradingview.com
+4. Find and copy the `sessionid` cookie value
+5. Use it as the `sessionId` parameter
+
+### Authentication Limitations
+- **Browser CORS**: Due to Cross-Origin Resource Sharing restrictions, authentication may not work in browsers
+- **Workaround**: Use a server-side proxy for authentication if needed
+- **Public Data**: Most data is available without authentication
+
+## 🌍 Browser Compatibility
+
+### ✅ Supported Browsers
+- Chrome 60+
+- Firefox 55+
+- Safari 11+
+- Edge 79+
+
+### ✅ Required Features
+- Native WebSocket API
 - ES2015+ modules
-- Modern browsers (Chrome, Firefox, Safari, Edge)
+- Fetch API (for authentication)
+- Modern JavaScript (Promise, async/await)
 
-### ⚠️ Limitations
-- **Authentication**: Due to CORS restrictions, `sessionId` authentication may not work in browsers
-- **Cross-origin requests**: TradingView may block requests from different domains
+### ⚠️ Known Limitations
+- Authentication blocked by CORS in most browsers
+- Some corporate networks block WebSocket connections
+- TradingView may rate-limit unauthenticated requests
 
-### 🔧 Solutions for Authentication
-1. **Server Proxy**: Create a backend endpoint to handle authentication
-2. **Manual Tokens**: Extract session tokens manually and provide them to the library
-3. **Unauthorized Access**: Use the library without authentication (limited data)
+## 🚀 Deployment
 
-### 📦 CDN Usage
-After publishing to npm, you can use the library directly in HTML:
-
+### Production Usage
 ```html
-<!-- Latest version -->
+<!-- Use specific version for production -->
 <script type="module">
-import { connect, getCandles } from 'https://unpkg.com/tvws@latest/dist/index.js';
-</script>
-
-<!-- Specific version -->
-<script type="module">
-import { connect, getCandles } from 'https://unpkg.com/tvws@0.0.3/dist/index.js';
+import { connect, getCandles } from 'https://unpkg.com/tvws@0.0.4/dist/index.js';
 </script>
 ```
+
+### Server-Side Usage (Node.js)
+```javascript
+import { connect, getCandles } from 'tvws';
+
+// Works in Node.js environments
+const connection = await connect({
+  endpoint: 'prodata',
+  sessionId: process.env.TRADINGVIEW_SESSION
+});
+
+const data = await getCandles({
+  connection,
+  symbols: ['CRYPTO:BTCUSD'],
+  timeframe: '1h',
+  amount: 24
+});
+
+await connection.close();
+```
+
+## 🛠️ Development
+
+### Building from Source
+```bash
+git clone https://github.com/badsector666/tvws.git
+cd tvws
+npm install
+npm run build
+```
+
+### Project Structure
+```
+tvws/
+├── src/                 # TypeScript source code
+├── dist/                # Compiled JavaScript distribution
+├── example/             # Complete web interface example
+│   ├── index.html      # Main example interface
+│   ├── script.js       # Example functionality
+│   └── styles.css      # Responsive styling
+└── package.json        # Project configuration
+```
+
+## 📝 Example Implementation Details
+
+The `example/` folder demonstrates a complete, production-ready implementation:
+
+### Key Features Demonstrated
+- **Error Handling** - Comprehensive error catching and user feedback
+- **Connection Management** - Automatic connection lifecycle management
+- **User Interface** - Responsive design with modern CSS
+- **Data Visualization** - Clean display of market data with statistics
+- **Debugging Tools** - Real-time logging and troubleshooting guides
+- **Authentication UI** - User-friendly authentication setup with help
+
+### UI Components
+- **Endpoint Selector** - Switch between different TradingView endpoints
+- **Authentication Panel** - Optional session ID input with instructions
+- **Symbol Presets** - Quick selection of popular trading symbols
+- **Timeframe Options** - All supported TradingView timeframes
+- **Results Display** - Formatted OHLCV data with price statistics
+- **Debug Console** - Real-time connection and data logging
+
+This example serves as both a testing tool and a reference implementation for integrating the tvws library into web applications.
+
+## 📄 License
+
+MIT License - see LICENSE file for details.
+
+## 🤝 Contributing
+
+Contributions welcome! Please read the contributing guidelines and submit pull requests.
+
+## 🔗 Links
+
+- **Repository**: https://github.com/badsector666/tvws
+- **NPM Package**: https://www.npmjs.com/package/tvws
+- **Live Demo**: See `example/` folder for complete implementation
+
+---
+
+**tvws** - Unofficial TradingView WebSocket library with browser compatibility and complete web interface.

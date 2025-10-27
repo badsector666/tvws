@@ -1,12 +1,17 @@
 // TradingView WebSocket Example - Complete Functionality
-// For development: using local build from dist folder (when serving from root)
-import { connect, getCandles, ENDPOINTS } from "../dist/index.js";
+// Production usage with CDN (after NPM publishing)
+import {
+  connect,
+  getCandles,
+  ENDPOINTS,
+} from "https://unpkg.com/tvws@latest/dist/index.js";
 
-// Alternative: If serving from root directory, use:
-// import { connect, getCandles, ENDPOINTS } from "/dist/index.js";
+// Alternative CDN options:
+// jsDelivr: import { connect, getCandles, ENDPOINTS } from "https://cdn.jsdelivr.net/npm/tvws@latest/dist/index.js";
+// Specific version: import { connect, getCandles, ENDPOINTS } from "https://unpkg.com/tvws@0.0.4/dist/index.js";
 
-// For production (after NPM publishing), you can use CDN instead:
-// import { connect, getCandles, ENDPOINTS } from "https://unpkg.com/tvws@latest/dist/index.js";
+// For development (when serving from project root):
+// import { connect, getCandles, ENDPOINTS } from "../dist/index.js";
 
 let connection = null;
 
@@ -113,13 +118,13 @@ function initializeEventListeners() {
 function toggleAuthFields() {
   try {
     console.log("toggleAuthFields called");
-    
+
     // Wait for DOM if needed
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', toggleAuthFields);
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", toggleAuthFields);
       return;
     }
-    
+
     const authToggle = document.getElementById("authToggle");
     const authFields = document.getElementById("authFields");
 
@@ -258,13 +263,13 @@ window.quickConnect = async function () {
 // Make functions globally available
 async function testConnection() {
   console.log("testConnection called");
-  
+
   // Wait for DOM if needed
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', testConnection);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", testConnection);
     return;
   }
-  
+
   const connectBtn = document.getElementById("connectBtn");
   const candlesBtn = document.getElementById("candlesBtn");
   const selectedEndpoint = document.getElementById("endpointSelect").value;
@@ -580,11 +585,11 @@ function validateSymbolTimeframe(ticker, timeframe, endpoint) {
 
 function clearResults() {
   // Wait for DOM if needed
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', clearResults);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", clearResults);
     return;
   }
-  
+
   document.getElementById("results").style.display = "none";
   document.getElementById("candleData").innerHTML = "";
   updateStatus("Results cleared.", "info");
@@ -593,11 +598,11 @@ function clearResults() {
 
 function clearLog() {
   // Wait for DOM if needed
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', clearLog);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", clearLog);
     return;
   }
-  
+
   document.getElementById("log").textContent = "";
 }
 
@@ -612,11 +617,11 @@ function selectPresetTicker() {
 
 function resetQueryForm() {
   // Wait for DOM if needed
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', resetQueryForm);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", resetQueryForm);
     return;
   }
-  
+
   document.getElementById("tickerInput").value = "FX:EURUSD";
   document.getElementById("tickerPreset").value = "";
   document.getElementById("timeframeSelect").value = "1D";
@@ -658,8 +663,8 @@ function log(message, type = "info") {
 // Function to initialize logging when DOM is ready
 function initializeLogging() {
   log("TradingView WebSocket Example loaded", "success");
-  log("Package: tvws (Browser Compatible)", "info");
-  log("Imported from: ../dist/index.js", "info");
+  log("Package: tvws (Browser Compatible with CDN)", "info");
+  log("Imported from: https://unpkg.com/tvws@latest/dist/index.js", "info");
   log("Ready to connect!", "success");
   log("", "info");
   log("=== Instructions ===", "info");
