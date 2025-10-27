@@ -1,19 +1,32 @@
 // TradingView WebSocket Example - Complete Functionality
-// Production usage with CDN (after NPM publishing)
-import {
-  connect,
-  getCandles,
-  ENDPOINTS,
-} from "https://unpkg.com/tvws@latest/dist/index.js";
-
-// Alternative CDN options:
-// jsDelivr: import { connect, getCandles, ENDPOINTS } from "https://cdn.jsdelivr.net/npm/tvws@latest/dist/index.js";
-// Specific version: import { connect, getCandles, ENDPOINTS } from "https://unpkg.com/tvws@0.0.4/dist/index.js";
-
-// For development (when serving from project root):
-// import { connect, getCandles, ENDPOINTS } from "../dist/index.js";
-
+// Using dynamic import to avoid Bun bundler issues with external CDN modules
 let connection = null;
+let tvwsModule = null;
+
+// Dynamic import function to load tvws from CDN
+async function loadTvwsModule() {
+  if (tvwsModule) return tvwsModule;
+
+  try {
+    // Try CDN first
+    tvwsModule = await import("https://unpkg.com/tvws@0.0.5/dist/index.js");
+    console.log("Loaded tvws from CDN successfully");
+  } catch (cdnError) {
+    console.warn("CDN import failed, trying local version:", cdnError);
+    try {
+      // Fallback to local development version
+      tvwsModule = await import("../dist/index.js");
+      console.log("Loaded tvws from local version successfully");
+    } catch (localError) {
+      console.error("Failed to load tvws from both CDN and local:", localError);
+      throw new Error(
+        "Unable to load tvws module. Please check your internet connection or run 'npm run build' first.",
+      );
+    }
+  }
+
+  return tvwsModule;
+}
 
 // Initialize all functions to make them available globally
 console.log("Initializing TradingView WebSocket example...");
@@ -218,6 +231,10 @@ window.quickConnect = async function () {
   );
 
   try {
+    // Load the tvws module dynamically
+    const { connect, getCandles, ENDPOINTS } = await loadTvwsModule();
+    log("✅ TVWS module loaded successfully", "success");
+
     connection = await connect({
       endpoint: "data",
       // No authentication - use unauthorized access
@@ -281,9 +298,13 @@ async function testConnection() {
 
   log("=== Connection Test Started ===", "info");
   log(`Endpoint: ${selectedEndpoint}`);
-  log(`WebSocket URL: ${ENDPOINTS[selectedEndpoint]}`);
 
   try {
+    // Load the tvws module dynamically
+    const { connect, getCandles, ENDPOINTS } = await loadTvwsModule();
+    log("✅ TVWS module loaded successfully", "success");
+    log(`WebSocket URL: ${ENDPOINTS[selectedEndpoint]}`);
+
     connection = await connect({
       endpoint: selectedEndpoint,
     });
@@ -353,6 +374,9 @@ async function loadData() {
     log("❌ No active connection. Please connect first.", "error");
     return;
   }
+
+  // Load the tvws module dynamically to ensure getCandles is available
+  const { getCandles } = await loadTvwsModule();
 
   // Get custom parameters from the form
   const ticker = document.getElementById("tickerInput").value.trim();
@@ -663,8 +687,9 @@ function log(message, type = "info") {
 // Function to initialize logging when DOM is ready
 function initializeLogging() {
   log("TradingView WebSocket Example loaded", "success");
-  log("Package: tvws (Browser Compatible with CDN)", "info");
-  log("Imported from: https://unpkg.com/tvws@latest/dist/index.js", "info");
+  log("Package: tvws v0.0.5 (Browser Compatible with CDN)", "info");
+  log("Import method: Dynamic import (to avoid Bun bundler issues)", "info");
+  log("CDN source: https://unpkg.com/tvws@0.0.5/dist/index.js", "info");
   log("Ready to connect!", "success");
   log("", "info");
   log("=== Instructions ===", "info");

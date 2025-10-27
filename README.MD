@@ -6,6 +6,7 @@ Browser-compatible TradingView WebSocket API with multiple endpoints and real-ti
 
 - ✅ **Browser Compatible** - Works in modern browsers with native WebSocket and Fetch APIs
 - ✅ **CDN Ready** - Available via npm CDNs (unpkg, jsDelivr)
+- ✅ **Bun Compatible** - Works with Bun bundler using dynamic imports
 - ✅ **Multiple Endpoints** - Support for different TradingView WebSocket endpoints
 - ✅ **Flexible Timeframes** - Supports various formats: "1m", "5m", "1h", "4h", "1D", etc.
 - ✅ **Real-time Data** - Subscribe to live market data updates
@@ -30,6 +31,21 @@ import { connect, getCandles, ENDPOINTS } from 'https://unpkg.com/tvws@latest/di
 <script type="module">
 import { connect, getCandles, ENDPOINTS } from 'https://cdn.jsdelivr.net/npm/tvws@latest/dist/index.js';
 </script>
+```
+
+## ⚠️ Important: Bun Compatibility
+
+If you're using **Bun** as your bundler or development server, you may encounter bundling issues with static CDN imports. The library includes built-in dynamic import support to handle this automatically.
+
+**For Bun users:**
+- The included example uses dynamic imports to avoid bundler issues
+- No additional configuration required
+- Works seamlessly with `bun run` and `bun dev`
+
+**If you encounter bundler issues:**
+```javascript
+// Use dynamic imports instead of static imports
+const { connect, getCandles, ENDPOINTS } = await import('https://unpkg.com/tvws@latest/dist/index.js');
 ```
 
 ## 🎯 Quick Start
@@ -72,12 +88,31 @@ console.log('AAPL candles:', candles);
 await connection.close();
 ```
 
+### Dynamic Import (Recommended for Bun)
+```javascript
+// For Bun or environments with bundler restrictions
+async function initTradingView() {
+  const { connect, getCandles } = await import('https://unpkg.com/tvws@latest/dist/index.js');
+  
+  const connection = await connect();
+  const candles = await getCandles({
+    connection,
+    symbols: ['FX:EURUSD'],
+    amount: 10,
+    timeframe: '1D'
+  });
+  
+  return { connection, candles };
+}
+```
+
 ## 🌐 Live Example
 
 The library includes a complete, production-ready web interface in the `example/` folder that now uses CDN for easy deployment:
 
 ### Features
 - **CDN-Powered** - Uses npm CDN for hassle-free setup without local builds
+- **Dynamic Import Support** - Automatic fallback to handle bundler limitations (Bun, etc.)
 - **Multi-endpoint Support** - Switch between data, prodata, widgetdata endpoints
 - **Authentication UI** - Optional session-based authentication with help guide
 - **Real-time Connection Status** - Live connection monitoring and debugging
@@ -88,19 +123,31 @@ The library includes a complete, production-ready web interface in the `example/
 - **Debug Logging** - Comprehensive logging for troubleshooting
 
 ### Running the Example
+
+#### Using Bun (Recommended)
 ```bash
 # Clone the repository
 git clone https://github.com/badsector666/tvws.git
 cd tvws
 
-# Serve the example directly (no build required for CDN version)
-npx serve example/
-# or
-python -m http.server 8000 --directory example
-# then open http://localhost:8000
+# Start with Bun (uses dynamic imports automatically)
+bun --port 3000 example/index.html
+# then open http://localhost:3000
 ```
 
-**Note:** The example now uses CDN by default, so you can serve the `example/` folder directly without building the library first.
+#### Using Other Servers
+```bash
+# Using Node.js serve
+npx serve example/
+
+# Using Python
+python -m http.server 8000 --directory example
+
+# Using any static server
+# then open the appropriate URL
+```
+
+**Note:** The example uses dynamic imports and automatically handles CDN vs local module loading, so you can serve the `example/` folder directly without building the library first.
 
 ### Example Interface
 The web example provides:
@@ -232,6 +279,11 @@ await connection.close();
 - Safari 11+
 - Edge 79+
 
+### ✅ Supported Runtimes
+- **Node.js** - Full support
+- **Bun** - Full support with dynamic imports
+- **Deno** - Should work (not tested)
+
 ### ✅ Required Features
 - Native WebSocket API
 - ES2015+ modules
@@ -242,6 +294,7 @@ await connection.close();
 - Authentication blocked by CORS in most browsers
 - Some corporate networks block WebSocket connections
 - TradingView may rate-limit unauthenticated requests
+- **Bun bundler**: Requires dynamic imports for external CDN modules
 
 ## 🚀 Deployment
 
@@ -249,15 +302,24 @@ await connection.close();
 ```html
 <!-- Use specific version for production -->
 <script type="module">
-import { connect, getCandles } from 'https://unpkg.com/tvws@0.0.4/dist/index.js';
+import { connect, getCandles } from 'https://unpkg.com/tvws@0.0.5/dist/index.js';
+</script>
+
+<!-- Or use dynamic imports for better bundler compatibility -->
+<script type="module">
+async function initApp() {
+  const { connect, getCandles } = await import('https://unpkg.com/tvws@0.0.5/dist/index.js');
+  // Your app logic here
+}
+initApp();
 </script>
 ```
 
-### Server-Side Usage (Node.js)
+### Server-Side Usage (Node.js/Bun)
 ```javascript
 import { connect, getCandles } from 'tvws';
 
-// Works in Node.js environments
+// Works in Node.js and Bun environments
 const connection = await connect({
   endpoint: 'prodata',
   sessionId: process.env.TRADINGVIEW_SESSION
@@ -290,16 +352,37 @@ tvws/
 ├── dist/                # Compiled JavaScript distribution
 ├── example/             # Complete web interface example
 │   ├── index.html      # Main example interface
-│   ├── script.js       # Example functionality
+│   ├── script.js       # Example functionality (with dynamic imports)
 │   └── styles.css      # Responsive styling
 └── package.json        # Project configuration
 ```
+
+## 🔧 Troubleshooting
+
+### Bun Bundler Issues
+If you encounter `Failed to load bundled module` errors with Bun:
+
+1. **Use the provided example** - It already includes dynamic import fixes
+2. **Use dynamic imports** in your own code:
+   ```javascript
+   const { connect, getCandles } = await import('tvws');
+   ```
+3. **Avoid static CDN imports** that cause bundler issues
+
+### Common Issues
+- **Connection timeouts** - Check network connectivity and try different endpoints
+- **No data received** - Verify symbol format and try different timeframes
+- **CORS errors** - Authentication may not work in browsers due to CORS restrictions
+
+### Debug Mode
+Enable debug logging by using the example interface or adding console.log statements to track connection progress.
 
 ## 📝 Example Implementation Details
 
 The `example/` folder demonstrates a complete, production-ready implementation:
 
 ### Key Features Demonstrated
+- **Dynamic Import Handling** - Automatic CDN vs local module loading
 - **Error Handling** - Comprehensive error catching and user feedback
 - **Connection Management** - Automatic connection lifecycle management
 - **User Interface** - Responsive design with modern CSS
@@ -314,6 +397,13 @@ The `example/` folder demonstrates a complete, production-ready implementation:
 - **Timeframe Options** - All supported TradingView timeframes
 - **Results Display** - Formatted OHLCV data with price statistics
 - **Debug Console** - Real-time connection and data logging
+
+### Dynamic Import Implementation
+The example includes a robust dynamic import system that:
+1. **Tries CDN first** - Attempts to load from unpkg CDN
+2. **Falls back to local** - Uses local build if CDN fails
+3. **Handles errors gracefully** - Provides clear error messages
+4. **Works with all bundlers** - Compatible with Bun, Vite, Webpack, etc.
 
 This example serves as both a testing tool and a reference implementation for integrating the tvws library into web applications.
 
@@ -333,4 +423,4 @@ Contributions welcome! Please read the contributing guidelines and submit pull r
 
 ---
 
-**tvws** - Unofficial TradingView WebSocket library with browser compatibility and complete web interface.
+**tvws** - Unofficial TradingView WebSocket library with browser compatibility, Bun support, and complete web interface.
