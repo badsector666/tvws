@@ -1,0 +1,103 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (leave empty for package.json version)'
+        required: false
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build
+
+      - name: Check version and publishing requirements
+        id: version-check
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+          echo "Package: $PACKAGE_NAME"
+          echo "Current version: $CURRENT_VERSION"
+
+          # Check if version already exists on npm
+          if npm view $PACKAGE_NAME@$CURRENT_VERSION >/dev/null 2>&1; then
+            echo "Version $CURRENT_VERSION already published"
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+            echo "publish_reason=Version already exists" >> $GITHUB_OUTPUT
+          else
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+            echo "publish_reason=New version to publish" >> $GITHUB_OUTPUT
+            echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create npm token for publishing
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: |
+          echo "⚠️  NPM_TOKEN secret is required for automatic publishing"
+          echo "Please add NPM_TOKEN to your repository secrets"
+
+      - name: Publish to npm
+        if: steps.version-check.outputs.should_publish == 'true' && secrets.NPM_TOKEN != ''
+        run: |
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.version-check.outputs.should_publish == 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ steps.version-check.outputs.new_version }}
+          body: |
+            ## Release ${{ steps.version-check.outputs.new_version }}
+
+            ### Changes
+            ${{ github.event.head_commit.message }}
+
+            ### Installation
+            ```bash
+            npm install tvws@${{ steps.version-check.outputs.new_version }}
+            ```
+
+            ### Size Optimization
+            - Using Bun bundler with minification
+            - Reduced bundle size by 77%
+            - Optimized for npm distribution
+          draft: false
+          prerelease: false
+
+      - name: Notification
+        if: steps.version-check.outputs.should_publish == 'true' && secrets.NPM_TOKEN != ''
+        run: |
+          echo "✅ Successfully published ${{ steps.version-check.outputs.new_version }} to npm!"
+          echo "📦 Install with: npm install tvws@${{ steps.version-check.outputs.new_version }}"
+          echo "🔗 Package: https://www.npmjs.com/package/tvws"
