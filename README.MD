@@ -345,6 +345,92 @@ npm install
 npm run build
 ```
 
+### Development Workflow
+This project uses **automated npm publishing** with GitHub Actions and **Bun** for optimal build performance.
+
+#### Prerequisites
+- Bun installed locally
+- GitHub account with repository access
+- npm account with publishing permissions
+
+#### Automated Publishing Setup
+The project includes a complete CI/CD pipeline that automatically publishes to npm when version tags are pushed.
+
+**For Maintainers:**
+```bash
+# Update version and publish (automated)
+npm version patch  # or minor/major
+git push origin master --tags
+```
+
+**What happens automatically:**
+1. GitHub Actions triggers on version tags (v*)
+2. Runs type checking and builds with Bun minification
+3. Publishes to npm using NPM_TOKEN secret
+4. Creates GitHub release with installation instructions
+5. Bundle size optimization (77% smaller than TypeScript build)
+
+#### Build Scripts
+```bash
+# Production build with Bun minification
+bun run build
+
+# Development build with TypeScript
+bun run build:dev
+
+# Type checking only
+bun run typecheck
+
+# Prepare for npm publishing (typecheck + build)
+bun run prepublishOnly
+```
+
+#### Bundle Size Optimization
+The project uses Bun bundler with minification for optimal npm package size:
+- **Before**: 52KB (TypeScript build with source maps)
+- **After**: 12KB (Bun minified bundle)
+- **Reduction**: 77% smaller
+
+**Build Configuration:**
+```bash
+# Bun build command used in CI/CD
+bun build src/index.ts --outfile dist/index.js --minify --target browser --format esm
+
+# TypeScript declarations only
+tsc --emitDeclarationOnly --declarationMap false
+```
+
+#### Repository Structure
+```
+tvws/
+├── src/                      # TypeScript source code
+├── dist/                     # Optimized bundle (12KB total)
+│   ├── index.js             # Minified bundle (7.1KB)
+│   └── index.d.ts           # TypeScript declarations (1.6KB)
+├── example/                  # Complete web interface example
+├── .github/workflows/        # GitHub Actions CI/CD
+│   └── npm-publish.yml      # Automated publishing workflow
+├── package.json             # Bun-optimized package configuration
+├── bun.lock                 # Bun dependency lock file
+└── tsconfig.json           # TypeScript configuration
+```
+
+#### Manual Publishing (Fallback)
+If automated publishing fails, you can publish manually:
+
+```bash
+# Build first
+bun run build
+
+# Publish manually (requires OTP if enabled)
+npm publish --access public
+
+# Or with specific token (if configured)
+npm publish --access public --token YOUR_TOKEN
+```
+
+**Important:** Do not commit `package-lock.json` as this project uses Bun for dependency management.
+
 ### Project Structure
 ```
 tvws/

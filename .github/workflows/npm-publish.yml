@@ -3,11 +3,11 @@ name: Publish to npm
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (leave empty for package.json version)'
+        description: "Version to publish (leave empty for package.json version)"
         required: false
         type: string
 
@@ -63,7 +63,7 @@ jobs:
           echo "Please add NPM_TOKEN to your repository secrets"
 
       - name: Publish to npm
-        if: steps.version-check.outputs.should_publish == 'true' && secrets.NPM_TOKEN != ''
+        if: steps.version-check.outputs.should_publish == 'true'
         run: |
           npm publish --access public
         env:
@@ -96,7 +96,7 @@ jobs:
           prerelease: false
 
       - name: Notification
-        if: steps.version-check.outputs.should_publish == 'true' && secrets.NPM_TOKEN != ''
+        if: steps.version-check.outputs.should_publish == 'true'
         run: |
           echo "✅ Successfully published ${{ steps.version-check.outputs.new_version }} to npm!"
           echo "📦 Install with: npm install tvws@${{ steps.version-check.outputs.new_version }}"
