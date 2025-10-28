@@ -56,16 +56,16 @@ jobs:
             echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create npm token for publishing
+      - name: Setup Node.js for npm publish
         if: steps.version-check.outputs.should_publish == 'true'
-        run: |
-          echo "⚠️  NPM_TOKEN secret is required for automatic publishing"
-          echo "Please add NPM_TOKEN to your repository secrets"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Publish to npm
         if: steps.version-check.outputs.should_publish == 'true'
-        run: |
-          npm publish --access public
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
