@@ -1,3 +1,27 @@
-dist
-node_modules
-.log
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build artifacts
+dist/
+*.log
+*.tgz
+.DS_Store
+.vscode/
+.idea/
+
+# Runtime
+.cache/
+.temp/
+.tmp/
+
+# Testing
+coverage/
+.nyc_output/
+
+# OS
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
