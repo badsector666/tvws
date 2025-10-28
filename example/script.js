@@ -92,11 +92,6 @@ function setupGlobalFunctions() {
       return selectPresetTicker();
     };
 
-    window.resetQueryForm = function () {
-      console.log("resetQueryForm called via window");
-      return resetQueryForm();
-    };
-
     window.log = log;
 
     console.log("All global functions have been set up successfully");
@@ -378,39 +373,37 @@ async function loadData() {
   // Load the tvws module dynamically to ensure getCandles is available
   const { getCandles } = await loadTvwsModule();
 
-  // Get custom parameters from the form
-  const ticker = document.getElementById("tickerInput").value.trim();
-  const timeframe = document.getElementById("timeframeSelect").value;
-  const amount = parseInt(document.getElementById("amountInput").value);
-  const extendedData = document.getElementById("extendedDataCheck").checked;
+  // Get parameters from the new form structure
+  const symbols = getSymbolsFromTextarea();
+  const selectedTimeframes = getSelectedTimeframes();
   const selectedEndpoint = document.getElementById("endpointSelect").value;
 
+  // Performance tracking setup
+  const performanceTracker = {
+    startTime: performance.now(),
+    endTime: null,
+    totalRequests: symbols.length * selectedTimeframes.length,
+    completedRequests: 0,
+    successfulRequests: 0,
+    failedRequests: 0,
+    totalCandlesReceived: 0,
+    totalBytesReceived: 0,
+    requestTimes: [],
+    symbolPerformance: {},
+    timeframePerformance: {},
+    errors: [],
+  };
+
   // Validate inputs
-  if (!ticker) {
-    log("❌ Please enter a ticker symbol", "error");
-    updateStatus("Please enter a ticker symbol", "error");
+  if (symbols.length === 0) {
+    log("❌ Please enter at least one symbol", "error");
+    updateStatus("Please enter at least one symbol", "error");
     return;
   }
 
-  // Validate symbol/timeframe combination
-  const validation = validateSymbolTimeframe(
-    ticker,
-    timeframe,
-    selectedEndpoint,
-  );
-  if (validation.issues.length > 0) {
-    log("⚠️ Potential Issues Detected:", "warning");
-    validation.issues.forEach((issue) => log(`- ${issue}`, "warning"));
-    log("💡 Suggestions:", "info");
-    validation.suggestions.forEach((suggestion) =>
-      log(`- ${suggestion}`, "info"),
-    );
-    log("Proceeding anyway...", "info");
-  }
-
-  if (amount < 1 || amount > 500) {
-    log("❌ Number of K-Lines must be between 1 and 500", "error");
-    updateStatus("Invalid number of K-Lines", "error");
+  if (selectedTimeframes.length === 0) {
+    log("❌ Please select at least one timeframe", "error");
+    updateStatus("Please select at least one timeframe", "error");
     return;
   }
 
@@ -424,127 +417,536 @@ async function loadData() {
   candlesBtn.textContent = "Loading...";
 
   // Update UI to show what we're fetching
-  const timeframeText = getTimeframeText(timeframe);
-  resultsTitle.textContent = `${ticker} K-Line Data (${timeframeText})`;
-  updateStatus(`Fetching ${ticker} data (${timeframeText})...`, "info");
+  resultsTitle.textContent = `K-Line Data (${symbols.length} symbols × ${selectedTimeframes.length} timeframes)`;
+  updateStatus(
+    `Fetching data for ${symbols.length} symbols across ${selectedTimeframes.length} timeframes...`,
+    "info",
+  );
 
   log("=== Data Fetch Started ===", "info");
-  log(`Symbol: ${ticker}`);
-  log(`Timeframe: ${timeframe} (${timeframeText})`);
-  log(`Amount: ${amount} candles`);
-  log(`Extended Data: ${extendedData ? "Enabled" : "Disabled"}`);
+  log(`Symbols: ${symbols.join(", ")}`);
+  log(
+    `Timeframes: ${selectedTimeframes.map((tf) => `${tf.timeframe} (${tf.amount} candles)`).join(", ")}`,
+  );
   log(`Endpoint: ${selectedEndpoint}`);
+  log(`Total requests: ${performanceTracker.totalRequests}`, "info");
+  log(`Performance tracking enabled - measuring API response times`, "info");
+
+  const allResults = [];
+  let totalSuccessful = 0;
+  let totalFailed = 0;
 
   try {
-    const candles = await getCandles({
-      connection,
-      symbols: [ticker],
-      amount: amount,
-      timeframe: timeframe,
+    // Process each symbol and timeframe combination
+    for (const symbol of symbols) {
+      // Initialize symbol performance tracking
+      performanceTracker.symbolPerformance[symbol] = {
+        requests: 0,
+        successful: 0,
+        failed: 0,
+        totalCandles: 0,
+        totalTime: 0,
+        averageTime: 0,
+      };
+
+      for (const tf of selectedTimeframes) {
+        // Initialize timeframe performance tracking
+        if (!performanceTracker.timeframePerformance[tf.timeframe]) {
+          performanceTracker.timeframePerformance[tf.timeframe] = {
+            requests: 0,
+            successful: 0,
+            failed: 0,
+            totalCandles: 0,
+            totalTime: 0,
+            averageTime: 0,
+          };
+        }
+
+        const requestStartTime = performance.now();
+        performanceTracker.symbolPerformance[symbol].requests++;
+        performanceTracker.timeframePerformance[tf.timeframe].requests++;
+
+        try {
+          log(`Fetching ${symbol} ${tf.timeframe}...`, "info");
+
+          // Validate symbol/timeframe combination
+          const validation = validateSymbolTimeframe(
+            symbol,
+            tf.timeframe,
+            selectedEndpoint,
+          );
+          if (validation.issues.length > 0) {
+            log(`⚠️ ${symbol} ${tf.timeframe}:`, "warning");
+            validation.issues.forEach((issue) =>
+              log(`  - ${issue}`, "warning"),
+            );
+          }
+
+          const candles = await getCandles({
+            connection,
+            symbols: [symbol],
+            amount: tf.amount,
+            timeframe: tf.timeframe,
+          });
+
+          const requestEndTime = performance.now();
+          const requestTime = requestEndTime - requestStartTime;
+
+          // Update performance metrics
+          performanceTracker.requestTimes.push(requestTime);
+          performanceTracker.completedRequests++;
+          performanceTracker.symbolPerformance[symbol].totalTime += requestTime;
+          performanceTracker.timeframePerformance[tf.timeframe].totalTime +=
+            requestTime;
+
+          if (candles.length > 0 && candles[0].length > 0) {
+            const result = {
+              symbol: symbol,
+              timeframe: tf.timeframe,
+              amount: tf.amount,
+              candles: candles[0],
+              success: true,
+              requestTime: requestTime,
+            };
+            allResults.push(result);
+            totalSuccessful++;
+
+            // Update performance metrics for successful requests
+            performanceTracker.successfulRequests++;
+            performanceTracker.totalCandlesReceived += candles[0].length;
+            performanceTracker.symbolPerformance[symbol].successful++;
+            performanceTracker.symbolPerformance[symbol].totalCandles +=
+              candles[0].length;
+            performanceTracker.timeframePerformance[tf.timeframe].successful++;
+            performanceTracker.timeframePerformance[
+              tf.timeframe
+            ].totalCandles += candles[0].length;
+
+            // Estimate bytes received (rough calculation)
+            const candleSize = JSON.stringify(candles[0]).length;
+            performanceTracker.totalBytesReceived += candleSize;
+
+            log(
+              `✅ ${symbol} ${tf.timeframe}: ${candles[0].length} candles (${requestTime.toFixed(0)}ms)`,
+              "success",
+            );
+
+            // Calculate and log price statistics
+            const closes = candles[0].map((c) => c.close);
+            const lastPrice = closes[closes.length - 1];
+            const firstPrice = closes[0];
+            const change = (
+              ((lastPrice - firstPrice) / firstPrice) *
+              100
+            ).toFixed(2);
+            const high = Math.max(...candles[0].map((c) => c.high));
+            const low = Math.min(...candles[0].map((c) => c.low));
+
+            log(
+              `   Last: ${lastPrice.toFixed(5)} | Change: ${change}% | High: ${high.toFixed(5)} | Low: ${low.toFixed(5)}`,
+              change >= 0 ? "success" : "warning",
+            );
+          } else {
+            log(
+              `⚠️ ${symbol} ${tf.timeframe}: No data received (${requestTime.toFixed(0)}ms)`,
+              "warning",
+            );
+            allResults.push({
+              symbol: symbol,
+              timeframe: tf.timeframe,
+              amount: tf.amount,
+              candles: [],
+              success: false,
+              error: "No data received",
+              requestTime: requestTime,
+            });
+            totalFailed++;
+
+            // Update performance metrics for failed requests
+            performanceTracker.failedRequests++;
+            performanceTracker.symbolPerformance[symbol].failed++;
+            performanceTracker.timeframePerformance[tf.timeframe].failed++;
+          }
+        } catch (error) {
+          const requestEndTime = performance.now();
+          const requestTime = requestEndTime - requestStartTime;
+          const errorMessage =
+            error?.message || error?.toString() || "Unknown error";
+
+          log(
+            `❌ ${symbol} ${tf.timeframe}: ${errorMessage} (${requestTime.toFixed(0)}ms)`,
+            "error",
+          );
+          allResults.push({
+            symbol: symbol,
+            timeframe: tf.timeframe,
+            amount: tf.amount,
+            candles: [],
+            success: false,
+            error: errorMessage,
+            requestTime: requestTime,
+          });
+          totalFailed++;
+
+          // Update performance metrics for failed requests
+          performanceTracker.failedRequests++;
+          performanceTracker.symbolPerformance[symbol].failed++;
+          performanceTracker.timeframePerformance[tf.timeframe].failed++;
+          performanceTracker.errors.push({
+            symbol: symbol,
+            timeframe: tf.timeframe,
+            error: errorMessage,
+            requestTime: requestTime,
+          });
+        }
+      }
+    }
+
+    // Finalize performance tracking
+    performanceTracker.endTime = performance.now();
+    performanceTracker.totalExecutionTime =
+      performanceTracker.endTime - performanceTracker.startTime;
+
+    // Calculate averages
+    Object.keys(performanceTracker.symbolPerformance).forEach((symbol) => {
+      const perf = performanceTracker.symbolPerformance[symbol];
+      perf.averageTime = perf.requests > 0 ? perf.totalTime / perf.requests : 0;
     });
 
-    if (candles.length > 0 && candles[0].length > 0) {
-      log(`✅ Successfully retrieved ${candles[0].length} candles`, "success");
+    Object.keys(performanceTracker.timeframePerformance).forEach(
+      (timeframe) => {
+        const perf = performanceTracker.timeframePerformance[timeframe];
+        perf.averageTime =
+          perf.requests > 0 ? perf.totalTime / perf.requests : 0;
+      },
+    );
 
-      // Display query info
-      queryInfo.innerHTML = `
-                <strong>Query Parameters:</strong>
-                Symbol: <code>${ticker}</code> |
-                Timeframe: <code>${timeframe}</code> |
-                Candles: <code>${amount}</code> |
-                Received: <code>${candles[0].length}</code> |
-                Endpoint: <code>${selectedEndpoint}</code>
-            `;
+    // Display results and performance metrics
+    displayResults(
+      allResults,
+      symbols,
+      selectedTimeframes,
+      selectedEndpoint,
+      totalSuccessful,
+      totalFailed,
+    );
+    displayPerformanceMetrics(performanceTracker);
 
-      // Display candle data
-      candleDataDiv.innerHTML = "";
-      candles[0].forEach((candle, index) => {
-        const date = new Date(candle.timestamp * 1000);
-        const candleEl = document.createElement("div");
-        candleEl.className = "candle-item";
-
-        let candleHtml = `
-                    <strong>Candle ${index + 1}:</strong> ${date.toLocaleString()} |
-                    Open: ${candle.open.toFixed(5)} |
-                    High: ${candle.high.toFixed(5)} |
-                    Low: ${candle.low.toFixed(5)} |
-                    Close: ${candle.close.toFixed(5)} |
-                    Volume: ${candle.volume}
-                `;
-
-        // Add extended data if enabled
-        if (extendedData && candle.vwap !== undefined) {
-          candleHtml += ` | VWAP: ${candle.vwap.toFixed(5)}`;
-        }
-        if (extendedData && candle.trades !== undefined) {
-          candleHtml += ` | Trades: ${candle.trades}`;
-        }
-
-        candleEl.innerHTML = candleHtml;
-        candleDataDiv.appendChild(candleEl);
-      });
-
-      resultsDiv.style.display = "block";
-      updateStatus(`✅ ${ticker} data loaded successfully!`, "success");
-      log("✅ Data displayed in results section", "success");
-
-      // Log price statistics
-      const closes = candles[0].map((c) => c.close);
-      const lastPrice = closes[closes.length - 1];
-      const firstPrice = closes[0];
-      const change = (((lastPrice - firstPrice) / firstPrice) * 100).toFixed(2);
-      const high = Math.max(...candles[0].map((c) => c.high));
-      const low = Math.min(...candles[0].map((c) => c.low));
-
-      log(`📊 Price Summary:`, "info");
-      log(`   Last Price: ${lastPrice.toFixed(5)}`, "info");
-      log(`   Change: ${change}%`, change >= 0 ? "success" : "warning");
-      log(`   High: ${high.toFixed(5)}`, "info");
-      log(`   Low: ${low.toFixed(5)}`, "info");
-    } else {
-      log("⚠️ No data received - possible reasons:", "warning");
-      log("- Symbol not available on this endpoint", "warning");
-      log("- Insufficient data for requested timeframe", "warning");
-      log("- Symbol may be delisted or temporarily unavailable", "warning");
-      log("- Try a different symbol or endpoint", "info");
-      updateStatus(`No data available for ${ticker}.`, "warning");
-    }
+    updateStatus(
+      `✅ Data fetch complete! ${totalSuccessful} successful, ${totalFailed} failed`,
+      totalFailed > 0 ? "warning" : "success",
+    );
+    log(`=== Data Fetch Completed ===`, "info");
+    log(
+      `Summary: ${totalSuccessful} successful, ${totalFailed} failed requests`,
+      totalFailed > 0 ? "warning" : "success",
+    );
+    log(
+      `Total execution time: ${performanceTracker.totalExecutionTime.toFixed(0)}ms`,
+      "info",
+    );
   } catch (error) {
     const errorMessage =
       error?.message || error?.toString() || "Unknown error occurred";
-    log(`❌ Data fetch failed: ${errorMessage}`, "error");
-    log("Troubleshooting tips:", "warning");
-
-    // Specific troubleshooting based on error type
-    if (
-      errorMessage.includes("critical_error") ||
-      errorMessage.includes("error")
-    ) {
-      log("🚨 Critical Error Detected:", "error");
-      log(
-        "- This usually means the symbol/timeframe is not supported",
-        "error",
-      );
-      log("- Try these solutions:", "info");
-      log("  • Use daily timeframe (1D) for crypto symbols", "info");
-      log("  • Try forex symbols for intraday data (FX:EURUSD)", "info");
-      log("  • Use prodata endpoint if you have premium access", "info");
-      log("  • Try different crypto symbols (CRYPTO:BTCUSD)", "info");
-    } else {
-      log("- Check if the ticker symbol is correct", "warning");
-      log("- Try a different timeframe (1D usually works)", "warning");
-      log("- Some symbols require specific endpoints", "warning");
-      log("- Check if the market is currently open for this symbol", "warning");
-    }
-
+    log(`❌ Critical error during data fetch: ${errorMessage}`, "error");
     updateStatus(`Failed to fetch data: ${errorMessage}`, "error");
   } finally {
     // Always re-enable the button, regardless of success or failure
     candlesBtn.disabled = false;
     candlesBtn.textContent = "📊 Get K-Line Data";
-    log("=== Data Fetch Completed ===", "info");
     log("🔄 You can try different settings and fetch again", "info");
   }
+}
+
+// New function to display results for multiple symbols and timeframes
+function displayResults(
+  results,
+  symbols,
+  timeframes,
+  endpoint,
+  totalSuccessful,
+  totalFailed,
+) {
+  const resultsDiv = document.getElementById("results");
+  const candleDataDiv = document.getElementById("candleData");
+  const resultsTitle = document.getElementById("resultsTitle");
+  const queryInfo = document.getElementById("queryInfo");
+
+  // Display query info
+  queryInfo.innerHTML = `
+    <strong>Query Summary:</strong>
+    ${symbols.length} symbols × ${timeframes.length} timeframes = ${symbols.length * timeframes.length} total requests |
+    <span style="color: ${totalSuccessful > 0 ? "green" : "inherit"}">${totalSuccessful} successful</span> |
+    <span style="color: ${totalFailed > 0 ? "orange" : "inherit"}">${totalFailed} failed</span> |
+    Endpoint: <code>${endpoint}</code>
+  `;
+
+  // Group results by symbol
+  const resultsBySymbol = {};
+  results.forEach((result) => {
+    if (!resultsBySymbol[result.symbol]) {
+      resultsBySymbol[result.symbol] = [];
+    }
+    resultsBySymbol[result.symbol].push(result);
+  });
+
+  // Clear and populate results
+  candleDataDiv.innerHTML = "";
+
+  Object.entries(resultsBySymbol).forEach(([symbol, symbolResults]) => {
+    const symbolSection = document.createElement("div");
+    symbolSection.className = "symbol-section";
+
+    let symbolHtml = `<h4>📈 ${symbol}</h4>`;
+
+    symbolResults.forEach((result) => {
+      const timeframeText = getTimeframeText(result.timeframe);
+
+      if (result.success && result.candles.length > 0) {
+        symbolHtml += `
+          <div class="timeframe-result">
+            <h5>${timeframeText} (${result.candles.length} candles)</h5>
+            <div class="candle-summary">
+        `;
+
+        // Calculate summary statistics
+        const closes = result.candles.map((c) => c.close);
+        const lastPrice = closes[closes.length - 1];
+        const firstPrice = closes[0];
+        const change = (((lastPrice - firstPrice) / firstPrice) * 100).toFixed(
+          2,
+        );
+        const high = Math.max(...result.candles.map((c) => c.high));
+        const low = Math.min(...result.candles.map((c) => c.low));
+        const volume = result.candles.reduce((sum, c) => sum + c.volume, 0);
+
+        symbolHtml += `
+          <div class="summary-stats">
+            <span class="stat">Last: <strong>${lastPrice.toFixed(5)}</strong></span>
+            <span class="stat ${change >= 0 ? "positive" : "negative"}">Change: <strong>${change}%</strong></span>
+            <span class="stat">High: ${high.toFixed(5)}</span>
+            <span class="stat">Low: ${low.toFixed(5)}</span>
+            <span class="stat">Volume: ${volume.toLocaleString()}</span>
+          </div>
+        `;
+
+        // Show first few candles as preview
+        symbolHtml += `<div class="candle-preview">`;
+        result.candles.slice(0, 3).forEach((candle, index) => {
+          const date = new Date(candle.timestamp * 1000);
+          symbolHtml += `
+            <div class="candle-item">
+              <strong>${date.toLocaleDateString()}:</strong>
+              O:${candle.open.toFixed(3)} H:${candle.high.toFixed(3)} L:${candle.low.toFixed(3)} C:${candle.close.toFixed(3)} V:${candle.volume}
+            </div>
+          `;
+        });
+
+        if (result.candles.length > 3) {
+          symbolHtml += `<div class="candle-more">... ${result.candles.length - 3} more candles</div>`;
+        }
+
+        symbolHtml += `</div></div>`;
+      } else {
+        symbolHtml += `
+          <div class="timeframe-result error">
+            <h5>${timeframeText} - Failed</h5>
+            <div class="error-message">${result.error || "No data available"}</div>
+          </div>
+        `;
+      }
+    });
+
+    symbolSection.innerHTML = symbolHtml;
+    candleDataDiv.appendChild(symbolSection);
+  });
+
+  resultsDiv.style.display = "block";
+  log("✅ Results displayed in organized format", "success");
+}
+
+// New function to display comprehensive performance metrics
+function displayPerformanceMetrics(performanceTracker) {
+  const performanceMetrics = document.getElementById("performanceMetrics");
+  const performanceSummary = document.getElementById("performanceSummary");
+  const performanceDetails = document.getElementById("performanceDetails");
+
+  // Calculate statistics
+  const avgRequestTime =
+    performanceTracker.requestTimes.length > 0
+      ? performanceTracker.requestTimes.reduce((a, b) => a + b, 0) /
+        performanceTracker.requestTimes.length
+      : 0;
+  const minRequestTime =
+    performanceTracker.requestTimes.length > 0
+      ? Math.min(...performanceTracker.requestTimes)
+      : 0;
+  const maxRequestTime =
+    performanceTracker.requestTimes.length > 0
+      ? Math.max(...performanceTracker.requestTimes)
+      : 0;
+  const requestsPerSecond =
+    performanceTracker.totalExecutionTime > 0
+      ? (
+          performanceTracker.completedRequests /
+          (performanceTracker.totalExecutionTime / 1000)
+        ).toFixed(2)
+      : 0;
+  const candlesPerSecond =
+    performanceTracker.totalExecutionTime > 0
+      ? (
+          performanceTracker.totalCandlesReceived /
+          (performanceTracker.totalExecutionTime / 1000)
+        ).toFixed(2)
+      : 0;
+  const bytesPerSecond =
+    performanceTracker.totalExecutionTime > 0
+      ? (
+          performanceTracker.totalBytesReceived /
+          (performanceTracker.totalExecutionTime / 1000)
+        ).toFixed(0)
+      : 0;
+
+  // Format bytes for display
+  const formatBytes = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  // Display summary
+  performanceSummary.innerHTML = `
+    <div class="performance-overview">
+      <div class="perf-stat">
+        <span class="perf-label">Total Time:</span>
+        <span class="perf-value">${performanceTracker.totalExecutionTime.toFixed(0)}ms</span>
+      </div>
+      <div class="perf-stat">
+        <span class="perf-label">Success Rate:</span>
+        <span class="perf-value ${performanceTracker.successfulRequests / performanceTracker.totalRequests > 0.8 ? "good" : "warning"}">
+          ${((performanceTracker.successfulRequests / performanceTracker.totalRequests) * 100).toFixed(1)}%
+        </span>
+      </div>
+      <div class="perf-stat">
+        <span class="perf-label">Requests/sec:</span>
+        <span class="perf-value">${requestsPerSecond}</span>
+      </div>
+      <div class="perf-stat">
+        <span class="perf-label">Candles/sec:</span>
+        <span class="perf-value">${candlesPerSecond}</span>
+      </div>
+      <div class="perf-stat">
+        <span class="perf-label">Data Received:</span>
+        <span class="perf-value">${formatBytes(performanceTracker.totalBytesReceived)}</span>
+      </div>
+      <div class="perf-stat">
+        <span class="perf-label">Avg Response:</span>
+        <span class="perf-value">${avgRequestTime.toFixed(0)}ms</span>
+      </div>
+    </div>
+  `;
+
+  // Display detailed breakdown
+  let detailsHtml = `
+    <div class="performance-breakdown">
+      <h4>📊 Performance Breakdown</h4>
+
+      <div class="perf-section">
+        <h5>Request Timing Statistics</h5>
+        <div class="perf-grid">
+          <div class="perf-item">
+            <span class="perf-small-label">Fastest:</span>
+            <span class="perf-small-value">${minRequestTime.toFixed(0)}ms</span>
+          </div>
+          <div class="perf-item">
+            <span class="perf-small-label">Slowest:</span>
+            <span class="perf-small-value">${maxRequestTime.toFixed(0)}ms</span>
+          </div>
+          <div class="perf-item">
+            <span class="perf-small-label">Average:</span>
+            <span class="perf-small-value">${avgRequestTime.toFixed(0)}ms</span>
+          </div>
+          <div class="perf-item">
+            <span class="perf-small-label">Total Requests:</span>
+            <span class="perf-small-value">${performanceTracker.totalRequests}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="perf-section">
+        <h5>Symbol Performance</h5>
+        <div class="perf-table">
+          ${Object.entries(performanceTracker.symbolPerformance)
+            .map(
+              ([symbol, perf]) => `
+            <div class="perf-row">
+              <span class="symbol-name">${symbol}</span>
+              <span class="perf-requests">${perf.requests} req</span>
+              <span class="perf-success ${perf.successful === perf.requests ? "good" : "partial"}">${perf.successful}/${perf.requests}</span>
+              <span class="perf-time">${perf.averageTime.toFixed(0)}ms avg</span>
+              <span class="perf-candles">${perf.totalCandles} candles</span>
+            </div>
+          `,
+            )
+            .join("")}
+        </div>
+      </div>
+
+      <div class="perf-section">
+        <h5>Timeframe Performance</h5>
+        <div class="perf-table">
+          ${Object.entries(performanceTracker.timeframePerformance)
+            .map(
+              ([timeframe, perf]) => `
+            <div class="perf-row">
+              <span class="timeframe-name">${timeframe}</span>
+              <span class="perf-requests">${perf.requests} req</span>
+              <span class="perf-success ${perf.successful === perf.requests ? "good" : "partial"}">${perf.successful}/${perf.requests}</span>
+              <span class="perf-time">${perf.averageTime.toFixed(0)}ms avg</span>
+              <span class="perf-candles">${perf.totalCandles} candles</span>
+            </div>
+          `,
+            )
+            .join("")}
+        </div>
+      </div>
+  `;
+
+  // Add error details if any
+  if (performanceTracker.errors.length > 0) {
+    detailsHtml += `
+      <div class="perf-section error-section">
+        <h5>❌ Error Details (${performanceTracker.errors.length})</h5>
+        <div class="error-list">
+          ${performanceTracker.errors
+            .slice(0, 5)
+            .map(
+              (error) => `
+            <div class="error-item">
+              <span class="error-symbol">${error.symbol} ${error.timeframe}:</span>
+              <span class="error-text">${error.error}</span>
+              <span class="error-time">(${error.requestTime.toFixed(0)}ms)</span>
+            </div>
+          `,
+            )
+            .join("")}
+          ${performanceTracker.errors.length > 5 ? `<div class="error-more">... ${performanceTracker.errors.length - 5} more errors</div>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  detailsHtml += `</div>`;
+  performanceDetails.innerHTML = detailsHtml;
+
+  // Show the performance section
+  performanceMetrics.style.display = "block";
+
+  log("✅ Performance metrics displayed", "success");
+  log(
+    `📊 Performance Summary: ${performanceTracker.totalRequests} requests, ${avgRequestTime.toFixed(0)}ms avg, ${requestsPerSecond} req/sec`,
+    "info",
+  );
 }
 
 // Helper function to get readable timeframe text
@@ -630,28 +1032,40 @@ function clearLog() {
   document.getElementById("log").textContent = "";
 }
 
-// New functions for custom K-Line query interface
-function selectPresetTicker() {
-  const preset = document.getElementById("tickerPreset").value;
-  if (preset) {
-    document.getElementById("tickerInput").value = preset;
-    log(`Selected preset ticker: ${preset}`, "info");
-  }
+// Helper function to parse symbols from textarea
+function getSymbolsFromTextarea() {
+  const textarea = document.getElementById("symbolsTextarea");
+  if (!textarea) return [];
+
+  const symbols = textarea.value
+    .split("\n")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  return symbols;
 }
 
-function resetQueryForm() {
-  // Wait for DOM if needed
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", resetQueryForm);
-    return;
-  }
+// Helper function to get selected timeframes with their amounts
+function getSelectedTimeframes() {
+  const checkboxes = document.querySelectorAll(
+    '.timeframe-item input[type="checkbox"]:checked',
+  );
+  const timeframes = [];
 
-  document.getElementById("tickerInput").value = "FX:EURUSD";
-  document.getElementById("tickerPreset").value = "";
-  document.getElementById("timeframeSelect").value = "1D";
-  document.getElementById("amountInput").value = "10";
-  document.getElementById("extendedDataCheck").checked = false;
-  log("Query form reset to default values", "info");
+  checkboxes.forEach((checkbox) => {
+    const timeframe = checkbox.value;
+    const amountInput = document.querySelector(
+      `.timeframe-amount[data-timeframe="${timeframe}"]`,
+    );
+    const amount = amountInput ? parseInt(amountInput.value) : 100;
+
+    timeframes.push({
+      timeframe: timeframe,
+      amount: amount,
+    });
+  });
+
+  return timeframes;
 }
 
 function updateStatus(message, type = "info") {
@@ -705,13 +1119,16 @@ function initializeLogging() {
   log("4. Configure your query parameters in the form below", "info");
   log('5. Click "📊 Get K-Line Data" once connected', "info");
   log("", "info");
-  log("📊 K-Line Query Features:", "info");
-  log("- Custom ticker symbols (e.g., BINANCE:BTCUSDT.P, FX:EURUSD)", "info");
-  log("- Multiple timeframes: 1m to 1M", "info");
-  log("- Adjustable number of candles (1-500)", "info");
-  log("- Quick selection from popular tickers", "info");
-  log("- Extended data option (VWAP, trades)", "info");
-  log("- Price statistics and change calculations", "info");
+  log("📊 Enhanced K-Line Query Features:", "info");
+  log("- Multiple symbols: Enter unlimited symbols in the textarea", "info");
+  log(
+    "- Multiple timeframes: Select multiple timeframes with checkboxes",
+    "info",
+  );
+  log("- Custom amounts: Set different candle amounts per timeframe", "info");
+  log("- Flexible symbol formats (e.g., BINANCE:BTCUSDT.P, FX:EURUSD)", "info");
+  log("- Comprehensive performance metrics and benchmarking", "info");
+  log("- Organized results display with summary statistics", "info");
   log("", "info");
   log("💡 Tips:", "info");
   log("- Use Quick Connect for fastest connection testing", "info");
@@ -724,10 +1141,18 @@ function initializeLogging() {
   log("- Try different timeframes if data is unavailable", "info");
   log("- Some symbols may require specific endpoints", "info");
   log("", "info");
-  log("🔍 Popular Ticker Formats:", "info");
-  log("- Crypto: BINANCE:BTCUSDT.P, CRYPTO:BTCUSD", "info");
-  log("- Forex: FX:EURUSD, FX:GBPUSD", "info");
-  log("- Stocks: NASDAQ:AAPL, NYSE:TSLA", "info");
-  log("- Indices: INDEX:SPX, INDEX:DJI", "info");
+  log("🔍 Enhanced Usage Tips:", "info");
+  log("- Enter multiple symbols, one per line in the textarea", "info");
+  log("- Select multiple timeframes to compare data across periods", "info");
+  log("- Set custom candle amounts optimized for each timeframe", "info");
+  log(
+    "- Default amounts: 1000 for minutes, 200 for hours, 30 for daily",
+    "info",
+  );
+  log("- Popular ticker formats:", "info");
+  log("  • Crypto: BINANCE:BTCUSDT.P, CRYPTO:BTCUSD", "info");
+  log("  • Forex: FX:EURUSD, FX:GBPUSD", "info");
+  log("  • Stocks: NASDAQ:AAPL, NYSE:TSLA", "info");
+  log("  • Indices: INDEX:SPX, INDEX:DJI", "info");
   log("", "info");
 }

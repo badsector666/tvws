@@ -153,128 +153,211 @@
             <div class="section-card query-section">
                 <h3>📊 K-Line Query Configuration</h3>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="tickerPreset" class="form-label"
-                            >Quick Select:</label
-                        >
-                        <select
-                            id="tickerPreset"
-                            class="form-control"
-                            onchange="selectPresetTicker()"
-                        >
-                            <option value="">Choose preset...</option>
-                            <optgroup label="Popular Crypto">
-                                <option value="BINANCE:BTCUSDT.P">
-                                    Bitcoin (Binance)
-                                </option>
-                                <option value="CRYPTO:BTCUSD">
-                                    Bitcoin (Crypto)
-                                </option>
-                                <option value="BINANCE:ETHUSDT.P">
-                                    Ethereum (Binance)
-                                </option>
-                                <option value="CRYPTO:ETHUSD">
-                                    Ethereum (Crypto)
-                                </option>
-                                <option value="BINANCE:DOGEUSDT.P">
-                                    Dogecoin (Binance)
-                                </option>
-                                <option value="CRYPTO:DOGEUSD">
-                                    Dogecoin (Crypto)
-                                </option>
-                                <option value="BINANCE:ADAUSDT.P">
-                                    Cardano (Binance)
-                                </option>
-                                <option value="BINANCE:SOLUSDT.P">
-                                    Solana (Binance)
-                                </option>
-                                <option value="BINANCE:XRPUSDT.P">
-                                    Ripple (Binance)
-                                </option>
-                            </optgroup>
-                            <optgroup label="Popular Forex">
-                                <option value="FX:EURUSD">EUR/USD</option>
-                                <option value="FX:GBPUSD">GBP/USD</option>
-                                <option value="FX:USDJPY">USD/JPY</option>
-                                <option value="FX:USDCHF">USD/CHF</option>
-                                <option value="OANDA:EUR_USD">
-                                    EUR/USD (OANDA)
-                                </option>
-                                <option value="OANDA:GBP_JPY">
-                                    GBP/JPY (OANDA)
-                                </option>
-                            </optgroup>
-                            <optgroup label="Popular Stocks">
-                                <option value="NASDAQ:AAPL">Apple</option>
-                                <option value="NASDAQ:TSLA">Tesla</option>
-                                <option value="NASDAQ:NVDA">NVIDIA</option>
-                                <option value="NYSE:GME">GameStop</option>
-                                <option value="NYSE:BABA">Alibaba</option>
-                                <option value="NASDAQ:AMZN">Amazon</option>
-                                <option value="NASDAQ:GOOGL">Google</option>
-                                <option value="NASDAQ:MSFT">Microsoft</option>
-                                <option value="NASDAQ:META">Meta</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="tickerInput" class="form-label"
-                            >Symbol:</label
-                        >
-                        <input
-                            type="text"
-                            id="tickerInput"
-                            class="form-control"
-                            value="FX:EURUSD"
-                            placeholder="e.g. FX:EURUSD"
-                        />
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="timeframeSelect" class="form-label"
-                            >Timeframe:</label
-                        >
-                        <select id="timeframeSelect" class="form-control">
-                            <option value="1m">1 minute</option>
-                            <option value="3m">3 minutes</option>
-                            <option value="5m">5 minutes</option>
-                            <option value="15m">15 minutes</option>
-                            <option value="30m">30 minutes</option>
-                            <option value="45m">45 minutes</option>
-                            <option value="1h">1 hour</option>
-                            <option value="2h">2 hours</option>
-                            <option value="3h">3 hours</option>
-                            <option value="4h">4 hours</option>
-                            <option value="1D" selected>1 day</option>
-                            <option value="1W">1 week</option>
-                            <option value="1M">1 month</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="amountInput" class="form-label"
-                            >Number of Candles:</label
-                        >
-                        <input
-                            type="number"
-                            id="amountInput"
-                            class="form-control"
-                            value="10"
-                            min="1"
-                            max="500"
-                        />
-                    </div>
+                <div class="form-group">
+                    <label for="symbolsTextarea" class="form-label"
+                        >Symbols (one per line):</label
+                    >
+                    <textarea
+                        id="symbolsTextarea"
+                        class="form-control"
+                        rows="6"
+                        placeholder="Enter symbols, one per line...&#10;Examples:&#10;BINANCE:BTCUSDT.P&#10;FX:EURUSD&#10;NASDAQ:AAPL&#10;CRYPTO:ETHUSD&#10;FX:GBPUSD&#10;NYSE:TSLA"
+                    >
+FX:EURUSD</textarea
+                    >
+                    <small class="form-help">
+                        Enter multiple symbols, one per line. Supports crypto,
+                        forex, stocks, etc.
+                    </small>
                 </div>
 
                 <div class="form-group">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="extendedDataCheck" />
-                        <label for="extendedDataCheck"
-                            >Show Extended Data (VWAP, trades)</label
-                        >
+                    <label class="form-label">Timeframes & Amounts:</label>
+                    <div class="timeframe-grid">
+                        <div class="timeframe-item">
+                            <input
+                                type="checkbox"
+                                id="tf_1m"
+                                value="1m"
+                                checked
+                            />
+                            <label for="tf_1m">1m</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="1m"
+                                value="1000"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 1m"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_3m" value="3m" />
+                            <label for="tf_3m">3m</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="3m"
+                                value="1000"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 3m"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_5m" value="5m" />
+                            <label for="tf_5m">5m</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="5m"
+                                value="1000"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 5m"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_15m" value="15m" />
+                            <label for="tf_15m">15m</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="15m"
+                                value="500"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 15m"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_30m" value="30m" />
+                            <label for="tf_30m">30m</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="30m"
+                                value="500"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 30m"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_45m" value="45m" />
+                            <label for="tf_45m">45m</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="45m"
+                                value="500"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 45m"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_1h" value="1h" />
+                            <label for="tf_1h">1h</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="1h"
+                                value="200"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 1h"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_2h" value="2h" />
+                            <label for="tf_2h">2h</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="2h"
+                                value="200"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 2h"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_3h" value="3h" />
+                            <label for="tf_3h">3h</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="3h"
+                                value="150"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 3h"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_4h" value="4h" />
+                            <label for="tf_4h">4h</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="4h"
+                                value="150"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 4h"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input
+                                type="checkbox"
+                                id="tf_1D"
+                                value="1D"
+                                checked
+                            />
+                            <label for="tf_1D">1D</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="1D"
+                                value="30"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 1D"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_1W" value="1W" />
+                            <label for="tf_1W">1W</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="1W"
+                                value="52"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 1W"
+                            />
+                        </div>
+                        <div class="timeframe-item">
+                            <input type="checkbox" id="tf_1M" value="1M" />
+                            <label for="tf_1M">1M</label>
+                            <input
+                                type="number"
+                                class="timeframe-amount"
+                                data-timeframe="1M"
+                                value="24"
+                                min="1"
+                                max="5000"
+                                title="Number of candles for 1M"
+                            />
+                        </div>
                     </div>
+                    <small class="form-help">
+                        Select multiple timeframes and set custom candle amounts
+                        for each. Default values are optimized per timeframe.
+                    </small>
                 </div>
 
                 <div class="button-group">
@@ -286,14 +369,18 @@
                     >
                         📊 Get K-Line Data
                     </button>
-                    <button
-                        id="resetQueryBtn"
-                        class="btn btn-outline"
-                        onclick="resetQueryForm()"
-                    >
-                        🔄 Reset Form
-                    </button>
                 </div>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div
+                id="performanceMetrics"
+                class="section-card performance-section"
+                style="display: none"
+            >
+                <h3>📊 Performance Metrics</h3>
+                <div id="performanceSummary" class="performance-summary"></div>
+                <div id="performanceDetails" class="performance-details"></div>
             </div>
 
             <!-- Results & Debug Log - Two Column Layout -->
