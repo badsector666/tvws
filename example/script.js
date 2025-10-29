@@ -3,13 +3,28 @@
 let connection = null;
 let tvwsModule = null;
 
+// Enhanced logging system with level filtering
+let currentLogLevel = "info"; // Default log level
+let realtimeSubscription = null; // Track real-time subscription
+let realtimeLoggingEnabled = false; // Toggle state
+
+// Log level priorities
+const LOG_LEVELS = {
+  trace: 0,
+  debug: 1,
+  info: 2,
+  warn: 3,
+  error: 4,
+  fatal: 5,
+};
+
 // Dynamic import function to load tvws from CDN
 async function loadTvwsModule() {
   if (tvwsModule) return tvwsModule;
 
   try {
     // Try CDN first
-    tvwsModule = await import("https://unpkg.com/tvws@0.0.5/dist/index.js");
+    tvwsModule = await import("https://unpkg.com/tvws@0.0.8/dist/index.js");
     console.log("Loaded tvws from CDN successfully");
   } catch (cdnError) {
     console.warn("CDN import failed, trying local version:", cdnError);
@@ -93,6 +108,14 @@ function setupGlobalFunctions() {
     };
 
     window.log = log;
+    window.setLogLevel = function () {
+      console.log("setLogLevel called via window");
+      return setLogLevel();
+    };
+    window.toggleRealtimeLogging = function () {
+      console.log("toggleRealtimeLogging called via window");
+      return toggleRealtimeLogging();
+    };
 
     console.log("All global functions have been set up successfully");
 
@@ -249,10 +272,8 @@ window.quickConnect = async function () {
     quickConnectBtn.textContent = "✅ Quick Connected";
     connectBtn.textContent = "Connected";
 
-    // Subscribe to real-time events
-    connection.subscribe((event) => {
-      log(`📡 Real-time event: ${event.name}`, "info");
-    });
+    // Enable real-time event toggle
+    enableRealtimeToggle();
   } catch (error) {
     const errorMessage =
       error?.message || error?.toString() || "Unknown error occurred";
@@ -323,10 +344,8 @@ async function testConnection() {
     candlesBtn.disabled = false;
     connectBtn.textContent = "Connected";
 
-    // Subscribe to real-time events
-    connection.subscribe((event) => {
-      log(`📡 Real-time event: ${event.name}`, "info");
-    });
+    // Enable real-time event toggle
+    enableRealtimeToggle();
   } catch (error) {
     // Extract proper error message
     const errorMessage =
@@ -1089,21 +1108,106 @@ function updateStatus(message, type = "info") {
 }
 
 function log(message, type = "info") {
+  // Map existing types to log levels
+  const typeToLevel = {
+    info: "info",
+    success: "info",
+    warning: "warn",
+    error: "error",
+  };
+
+  const level = typeToLevel[type] || "info";
+
+  // Filter based on log level
+  if (LOG_LEVELS[level] < LOG_LEVELS[currentLogLevel]) {
+    return; // Skip this log message
+  }
+
   const timestamp = new Date().toLocaleTimeString();
-  const logMessage = `[${timestamp}] ${message}`;
+  const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
   console.log(logMessage);
 
   const logEl = document.getElementById("log");
-  logEl.textContent += logMessage + "\n";
-  logEl.scrollTop = logEl.scrollHeight;
+  if (logEl) {
+    logEl.textContent += logMessage + "\n";
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+}
+
+// Enhanced log level management functions
+function setLogLevel() {
+  const select = document.getElementById("logLevelSelect");
+  if (select) {
+    currentLogLevel = select.value;
+    log(`Log level changed to: ${currentLogLevel.toUpperCase()}`, "info");
+  }
+}
+
+// Real-time event logging management
+function enableRealtimeLogging() {
+  if (!connection || realtimeSubscription) {
+    return;
+  }
+
+  realtimeSubscription = connection.subscribe((event) => {
+    // Only log if debug level or lower, and filter out "du" events at info level
+    if (LOG_LEVELS[currentLogLevel] <= LOG_LEVELS["debug"]) {
+      log(`📡 Real-time event: ${event.name}`, "debug");
+    } else if (
+      event.name !== "du" &&
+      LOG_LEVELS[currentLogLevel] <= LOG_LEVELS["info"]
+    ) {
+      log(`📡 Real-time event: ${event.name}`, "info");
+    }
+  });
+
+  realtimeLoggingEnabled = true;
+  log("✅ Real-time event logging enabled", "info");
+}
+
+function disableRealtimeLogging() {
+  if (realtimeSubscription) {
+    realtimeSubscription();
+    realtimeSubscription = null;
+  }
+
+  realtimeLoggingEnabled = false;
+  log("⏸️ Real-time event logging disabled", "info");
+}
+
+function toggleRealtimeLogging() {
+  if (realtimeLoggingEnabled) {
+    disableRealtimeLogging();
+  } else {
+    enableRealtimeLogging();
+  }
+
+  // Update toggle button state
+  const toggleBtn = document.getElementById("realtimeToggleBtn");
+  if (toggleBtn) {
+    toggleBtn.textContent = realtimeLoggingEnabled
+      ? "⏸️ Disable Real-time Events"
+      : "▶️ Enable Real-time Events";
+    toggleBtn.className = realtimeLoggingEnabled
+      ? "btn btn-warning"
+      : "btn btn-outline";
+  }
+}
+
+// Enable real-time toggle button after connection
+function enableRealtimeToggle() {
+  const toggleBtn = document.getElementById("realtimeToggleBtn");
+  if (toggleBtn) {
+    toggleBtn.disabled = false;
+  }
 }
 
 // Function to initialize logging when DOM is ready
 function initializeLogging() {
   log("TradingView WebSocket Example loaded", "success");
-  log("Package: tvws v0.0.5 (Browser Compatible with CDN)", "info");
+  log("Package: tvws v0.0.8 (Browser Compatible with CDN)", "info");
   log("Import method: Dynamic import (to avoid Bun bundler issues)", "info");
-  log("CDN source: https://unpkg.com/tvws@0.0.5/dist/index.js", "info");
+  log("CDN source: https://unpkg.com/tvws@0.0.8/dist/index.js", "info");
   log("Ready to connect!", "success");
   log("", "info");
   log("=== Instructions ===", "info");

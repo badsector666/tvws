@@ -907,6 +907,82 @@ select.form-control {
     font-weight: 600;
 }
 
+/* Debug Controls */
+.debug-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.control-group label {
+    color: var(--text-light);
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+.control-group select {
+    background: var(--bg-dark);
+    color: var(--text-light);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.875rem;
+    min-width: 120px;
+}
+
+.control-group select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.2);
+}
+
+.control-group .btn {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: 0.875rem;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.control-group .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.control-group .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive debug controls */
+@media (max-width: 768px) {
+    .debug-controls {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .control-group {
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .control-group select {
+        flex: 1;
+        max-width: 150px;
+    }
+}
+
 .log-container {
     background: #0d1117;
     border-radius: var(--radius-sm);

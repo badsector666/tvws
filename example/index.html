@@ -399,6 +399,40 @@ FX:EURUSD</textarea
                 <!-- Debug Log -->
                 <div class="debug-log compact">
                     <h3>📋 Debug Log</h3>
+                    <div class="debug-controls">
+                        <div class="control-group">
+                            <label for="logLevelSelect">Log Level:</label>
+                            <select
+                                id="logLevelSelect"
+                                onchange="setLogLevel()"
+                            >
+                                <option value="trace">Trace (All)</option>
+                                <option value="debug">Debug</option>
+                                <option value="info" selected>Info</option>
+                                <option value="warn">Warning</option>
+                                <option value="error">Error</option>
+                                <option value="fatal">Fatal Only</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <button
+                                id="realtimeToggleBtn"
+                                class="btn btn-outline"
+                                onclick="toggleRealtimeLogging()"
+                                disabled
+                            >
+                                ▶️ Enable Real-time Events
+                            </button>
+                        </div>
+                        <div class="control-group">
+                            <button
+                                class="btn btn-outline"
+                                onclick="clearLog()"
+                            >
+                                🗑️ Clear Log
+                            </button>
+                        </div>
+                    </div>
                     <div id="log" class="log-container"></div>
                 </div>
             </div>
