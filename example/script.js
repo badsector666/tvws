@@ -24,7 +24,7 @@ async function loadTvwsModule() {
 
   try {
     // Try CDN first
-    tvwsModule = await import("https://unpkg.com/tvws@0.0.8/dist/index.js");
+    tvwsModule = await import("https://unpkg.com/tvws@0.0.9/dist/index.js");
     console.log("Loaded tvws from CDN successfully");
   } catch (cdnError) {
     console.warn("CDN import failed, trying local version:", cdnError);
@@ -1205,9 +1205,9 @@ function enableRealtimeToggle() {
 // Function to initialize logging when DOM is ready
 function initializeLogging() {
   log("TradingView WebSocket Example loaded", "success");
-  log("Package: tvws v0.0.8 (Browser Compatible with CDN)", "info");
+  log("Package: tvws v0.0.9 (Browser Compatible with CDN)", "info");
   log("Import method: Dynamic import (to avoid Bun bundler issues)", "info");
-  log("CDN source: https://unpkg.com/tvws@0.0.8/dist/index.js", "info");
+  log("CDN source: https://unpkg.com/tvws@0.0.9/dist/index.js", "info");
   log("Ready to connect!", "success");
   log("", "info");
   log("=== Instructions ===", "info");
