@@ -13,9 +13,9 @@
   "module": "dist/index.js",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     }
   },
   "files": [
@@ -23,10 +23,14 @@
     "README.MD"
   ],
   "scripts": {
-    "build": "bun build src/index.ts --outfile dist/index.js --minify --target browser --format esm && tsc --emitDeclarationOnly --declarationMap false",
-    "build:dev": "tsc",
+    "dev": "bunx --bun vite",
+    "build": "vite build && tsc --emitDeclarationOnly --declarationMap false",
+    "build:lib": "bun build src/index.ts --outfile dist/index.js --minify --target browser --format esm && tsc --emitDeclarationOnly --declarationMap false",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run typecheck && bun run build"
+    "prepublishOnly": "bun run typecheck && bun run build:lib"
   },
   "author": "badsector666 <badsectorkiller666@gmail.com>",
   "license": "MIT",
@@ -44,9 +48,16 @@
     "stocks",
     "crypto"
   ],
-  "dependencies": {},
   "devDependencies": {
-    "@types/node": "^17.0.45",
-    "typescript": "^4.9.5"
+    "@tailwindcss/postcss": "^4.1.16",
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/node": "^22.18.13",
+    "autoprefixer": "^10.4.21",
+    "daisyui": "^5.3.10",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.16",
+    "typescript": "^4.9.5",
+    "vite": "^7.1.12",
+    "vitest": "^4.0.6"
   }
 }
