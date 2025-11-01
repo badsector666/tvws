@@ -1,7 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    "./index.html",
+    "./example/index.html",
+    "./example/**/*.{js,ts,jsx,tsx,css}",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
@@ -42,4 +43,4 @@ export default {
       "procyon",
     ],
   },
-}
+};
