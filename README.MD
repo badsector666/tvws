@@ -404,23 +404,27 @@ unsubscribe();
 
 ## 📚 Examples & Demos
 
-For comprehensive examples and live demos, visit our **examples repository**:
+For comprehensive examples and live demos, visit our **demo repository**:
 
-🔗 **[tvws-examples](https://github.com/badsector666/tvws-examples)**
+🔗 **[tvws-demo](https://github.com/badsector666/tvws-demo)**
 
 ### Available Examples
-- **Basic Usage** - Simple connection and candle fetching
-- **Advanced Dashboard** - Professional trading interface  
-- **Study Examples** - Custom technical studies
-- **Replay Examples** - Historical data playback
-- **Quote Examples** - Real-time quote tracking
+- **Live Demo** - Interactive trading interface with real-time data
+- **WebSocket Connection** - Connect to TradingView endpoints
+- **Authentication** - Optional session-based authentication
+- **Multiple Symbols** - Query multiple trading pairs simultaneously
+- **All Timeframes** - Support for every TradingView timeframe
+- **Performance Metrics** - Connection and data performance monitoring
+- **Error Handling** - Comprehensive error management
 
-### Quick Start with Examples
+### Quick Start with Demo
 ```bash
-git clone https://github.com/badsector666/tvws-examples.git
-cd tvws-examples
-bun install && bun run dev
+git clone https://github.com/badsector666/tvws-demo.git
+cd tvws-demo
+npm install && npm run dev
 ```
+
+Visit http://localhost:5173 for the live demo!
 
 ## 🎯 Advanced Usage Examples
 
