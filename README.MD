@@ -1,20 +1,22 @@
 # TVWS - TradingView WebSocket Library
 
-🚀 **Browser-compatible TradingView WebSocket API** for fetching real-time and historical market data with multiple endpoints support.
+🚀 **Browser-compatible TradingView WebSocket API** with extensible event system for real-time market data and advanced TradingView features.
 
 [![npm version](https://badge.fury.io/js/tvws.svg)](https://badge.fury.io/js/tvws)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## ✨ Features
 
-- 🌐 **Browser & Node.js Compatible** - Works seamlessly in both environments
+- 🌐 **Browser & CDN Ready** - Works seamlessly in browsers and available via CDN
 - 🔄 **Multiple Endpoints** - Access different TradingView data sources
 - 📊 **Comprehensive Market Data** - Forex, crypto, stocks, commodities, and more
 - 🎯 **High Performance** - Optimized WebSocket connections with efficient data handling
-- 🛡️ **TypeScript Support** - Full type definitions included
+- 🛡️ **Full TypeScript Support** - Complete type definitions included
 - 🔐 **Optional Authentication** - Access premium data with TradingView session
 - 📈 **Multiple Timeframes** - Support for all TradingView chart intervals
-- 🎨 **Beautiful Demo Interface** - Complete web example with modern UI
+- ⚡ **Extensible Event System** - Composable handlers for studies, replay, quotes, and more
+- 🧩 **Modular Architecture** - Clean handler registry for adding new TradingView features
+- 📦 **Zero Dependencies** - Pure WebSocket API, no external runtime dependencies
 
 ## 📦 Installation
 
@@ -101,10 +103,10 @@ async function fetchData() {
 
 ## 🔧 Development Setup
 
-This project uses Vite for development and building. The example folder serves as the main development source.
+This project uses Bun for a minimal, fast development and build process.
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v16+) or [Bun](https://bun.sh/)
+- [Bun](https://bun.sh/) (v1.0+) or [Node.js](https://nodejs.org/) (v16+)
 - Git
 
 ### Clone & Install
@@ -114,39 +116,25 @@ cd tvws
 bun install  # or npm install
 ```
 
-### Development Server
-```bash
-# Start development server (serves from example folder)
-bun run dev
-
-# Alternative: npm run dev
-```
-🎯 **Access**: http://localhost:5173
-
 ### Build for Production
 ```bash
-# Build the library and example
+# Build all formats (ESM, UMD, CJS) and TypeScript definitions
 bun run build
 
-# Build library only
-bun run build:lib
+# Build individual formats
+bun run build:umd     # UMD for browsers/CDN
+bun run build:cjs     # CommonJS for Node.js
+bun run build:types   # TypeScript definitions only
 ```
-
-### Preview Production Build
-```bash
-# Preview the built example
-bun run preview
-```
-🎯 **Access**: http://localhost:4173
 
 ### Available Scripts
 ```bash
-bun run dev          # Start development server
-bun run build        # Build library and example
-bun run build:lib    # Build library only
-bun run preview      # Preview built example
-bun run test         # Run tests
+bun run build        # Build all formats and type definitions
+bun run build:umd    # Build UMD format for browser/CDN use
+bun run build:cjs    # Build CommonJS format for Node.js
+bun run build:types  # Build TypeScript type definitions only
 bun run typecheck    # TypeScript type checking
+bun run clean        # Clean dist directory
 ```
 
 ## 📊 API Reference
@@ -303,6 +291,135 @@ interface CandleData {
     volume: 1380
   }
 ]
+```
+
+## 🚀 Advanced Features
+
+### Studies
+Create and manage custom technical studies on TradingView charts.
+
+```javascript
+import { createStudy, modifyStudy, removeStudy } from 'tvws';
+
+const connection = await connect();
+
+// Create a custom study
+const studyData = await createStudy(connection, {
+  symbol: 'BINANCE:BTCUSDT.P',
+  studyId: 'my_rsi_study',
+  script: `
+    study("RSI Study")
+    rsi = rsi(close, 14)
+    plot(rsi)
+  `,
+  inputs: {
+    length: 14,
+    source: 'close'
+  }
+});
+
+// Modify an existing study
+modifyStudy(connection, 'my_rsi_study', {
+  inputs: { length: 21 }
+});
+
+// Remove a study
+removeStudy(connection, 'my_rsi_study');
+```
+
+### Replay
+Control historical data playback for backtesting and analysis.
+
+```javascript
+import { createReplay, ReplayController } from 'tvws';
+
+const connection = await connect();
+
+// Create a replay session
+const replayState = await createReplay(connection, {
+  symbols: ['BINANCE:BTCUSDT.P'],
+  timeframe: '1h',
+  startTime: Date.now() - (7 * 24 * 60 * 60 * 1000), // 7 days ago
+  endTime: Date.now(),
+  speed: 1 // 1x speed
+});
+
+// Control replay playback
+const controller = new ReplayController(connection, replayState.sessionId);
+controller.start(2); // Start at 2x speed
+controller.step(5);  // Move forward 5 bars
+controller.pause();  // Pause playback
+controller.reset();  // Reset to beginning
+```
+
+### Real-time Quotes
+Get real-time quote data for multiple symbols with custom fields.
+
+```javascript
+import { getQuotes, addQuoteSymbols, setQuoteFields } from 'tvws';
+
+const connection = await connect();
+
+// Get real-time quotes
+const quotes = await getQuotes(connection, {
+  symbols: ['AAPL', 'GOOGL', 'MSFT'],
+  fields: ['price', 'volume', 'change', 'change_percent', 'bid', 'ask']
+});
+
+console.log(quotes.get('AAPL')); // { price: 150.25, volume: 1000000, ... }
+
+// Add more symbols to existing quote session
+addQuoteSymbols(connection, quotes.sessionId, ['TSLA', 'AMZN']);
+
+// Change quote fields
+setQuoteFields(connection, quotes.sessionId, ['price', 'volume', 'market_cap']);
+```
+
+### Event-Driven Architecture
+The library uses a composable event handler system for extensibility.
+
+```javascript
+import { connect } from 'tvws';
+
+const connection = await connect();
+
+// Subscribe to specific event types only
+const unsubscribe = connection.subscribe(
+  (event) => {
+    console.log('Custom event handler:', event);
+  },
+  // Filter for specific events
+  (event) => ['timescale_update', 'study_completed'].includes(event.name),
+  // Priority (higher = called first)
+  10
+);
+
+// Add multiple handlers with different priorities
+connection.subscribe(console.log, null, 5);  // Lower priority
+connection.subscribe(console.log, null, 15); // Higher priority
+
+// Clean up when done
+unsubscribe();
+```
+
+## 📚 Examples & Demos
+
+For comprehensive examples and live demos, visit our **examples repository**:
+
+🔗 **[tvws-examples](https://github.com/badsector666/tvws-examples)**
+
+### Available Examples
+- **Basic Usage** - Simple connection and candle fetching
+- **Advanced Dashboard** - Professional trading interface  
+- **Study Examples** - Custom technical studies
+- **Replay Examples** - Historical data playback
+- **Quote Examples** - Real-time quote tracking
+
+### Quick Start with Examples
+```bash
+git clone https://github.com/badsector666/tvws-examples.git
+cd tvws-examples
+bun install && bun run dev
 ```
 
 ## 🎯 Advanced Usage Examples

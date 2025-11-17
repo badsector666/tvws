@@ -1,8 +1,8 @@
 {
   "name": "tvws",
-  "version": "0.0.10",
-  "type": "module",
-  "description": "Browser-compatible TradingView WebSocket API with multiple endpoints support",
+  "version": "0.0.11",
+  "module": "ESNext",
+  "description": "Browser-compatible TradingView WebSocket API with extensible event system",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/badsector666/tvws.git"
@@ -10,12 +10,12 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "browser": "dist/index.js",
-  "module": "dist/index.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "require": "./dist/index.cjs",
+      "browser": "./dist/index.umd.js"
     }
   },
   "files": [
@@ -23,41 +23,34 @@
     "README.MD"
   ],
   "scripts": {
-    "dev": "bunx --bun vite",
-    "build": "vite build && tsc --emitDeclarationOnly --declarationMap false",
-    "build:lib": "bun build src/index.ts --outfile dist/index.js --minify --target browser --format esm && tsc --emitDeclarationOnly --declarationMap false",
-    "preview": "vite preview",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run typecheck && bun run build:lib"
+    "build": "bun run build.js",
+    "build:types": "bunx tsc --emitDeclarationOnly",
+    "typecheck": "bunx tsc --noEmit",
+    "dev": "bun run build",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "bun run typecheck && bun run build"
   },
   "author": "badsector666 <badsectorkiller666@gmail.com>",
   "license": "MIT",
   "keywords": [
     "tradingview",
-    "scraper",
-    "scraping",
     "websocket",
+    "market-data",
     "candlestick",
     "browser",
     "cdn",
     "es2015",
-    "market-data",
     "forex",
     "stocks",
-    "crypto"
+    "crypto",
+    "real-time",
+    "api",
+    "extensible"
   ],
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.16",
-    "@tailwindcss/typography": "^0.5.19",
-    "@types/node": "^22.18.13",
-    "autoprefixer": "^10.4.21",
-    "daisyui": "^5.3.10",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.16",
-    "typescript": "^4.9.5",
-    "vite": "^7.1.12",
-    "vitest": "^4.0.6"
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
   }
 }
