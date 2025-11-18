@@ -19,8 +19,7 @@
     }
   },
   "files": [
-    "dist/",
-    "README.MD"
+    "dist/"
   ],
   "scripts": {
     "build": "bun run build.js",
