@@ -1,6 +1,6 @@
 {
   "name": "tvws",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "module": "ESNext",
   "description": "Browser-compatible TradingView WebSocket API with extensible event system",
   "repository": {
@@ -47,7 +47,7 @@
     "extensible"
   ],
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "typescript": "^5.9.3"
   },
   "engines": {
     "bun": ">=1.0.0"
