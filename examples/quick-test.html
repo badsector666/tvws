@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TVWS Quick Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🚀 TVWS Quick Test</h1>
+    <div id="status" class="test info">Loading...</div>
+    <div id="results"></div>
+
+    <script src="../dist/tvws.browser.js"></script>
+    <script>
+        const status = document.getElementById('status');
+        const results = document.getElementById('results');
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test ${type}`;
+            div.textContent = message;
+            results.appendChild(div);
+        }
+
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `test ${type}`;
+        }
+
+        // Test the library
+        if (typeof tvws !== 'undefined') {
+            updateStatus('✅ TVWS library loaded!', 'success');
+            addResult('Library loaded successfully', 'success');
+
+            try {
+                // Test createClient
+                const client = tvws.createClient();
+                addResult('✅ createClient() works', 'success');
+
+                // Test chart session
+                const chart = client.createChart();
+                addResult(`✅ Chart session created: ${chart.id}`, 'success');
+
+                // Test quote session
+                const quote = client.createQuote();
+                addResult(`✅ Quote session created: ${quote.id}`, 'success');
+
+                // Test methods
+                addResult(`✅ Chart has setSymbol: ${typeof chart.setSymbol === 'function'}`, 'success');
+                addResult(`✅ Quote has addSymbol: ${typeof quote.addSymbol === 'function'}`, 'success');
+
+                updateStatus('🎉 All tests passed!', 'success');
+
+            } catch (error) {
+                addResult(`❌ Error during testing: ${error.message}`, 'error');
+                updateStatus('❌ Test failed', 'error');
+            }
+        } else {
+            updateStatus('❌ TVWS library not found', 'error');
+            addResult('❌ tvws object is undefined', 'error');
+        }
+    </script>
+</body>
+</html>

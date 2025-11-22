@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TVWS Simple Bundle Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 TVWS Simple Bundle Test</h1>
+        <p>This test uses a bundled approach that works well with Bun's bundler.</p>
+        <div id="status" class="status info">Loading TVWS library...</div>
+        <div id="available-functions"></div>
+    </div>
+
+    <div class="container">
+        <h2>Quick Tests</h2>
+        <div class="button-group">
+            <button onclick="testBasicFunctions()">Basic Functions</button>
+            <button onclick="testSessions()">All Sessions</button>
+            <button onclick="testChaining()">Method Chaining</button>
+            <button onclick="testEvents()">Event System</button>
+            <button onclick="testInheritance()">Class Inheritance</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Test Results</h2>
+        <div id="results"></div>
+    </div>
+
+    <!-- Include the bundled TVWS library -->
+    <script type="module" src="./tvws-bundle.js"></script>
+
+    <script>
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function addResult(message, type = 'success') {
+            const resultsEl = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+            resultsEl.appendChild(div);
+        }
+
+        function showAvailableFunctions() {
+            if (typeof tvws !== 'undefined') {
+                const functionsEl = document.getElementById('available-functions');
+                const functions = Object.keys(tvws);
+                functionsEl.innerHTML = `
+                    <div class="status success">
+                        <strong>Available functions:</strong> ${functions.join(', ')}
+                    </div>
+                `;
+                updateStatus('✅ TVWS library loaded successfully!', 'success');
+                addResult('TVWS loaded with global tvws object', 'success');
+            } else {
+                updateStatus('❌ TVWS library not found', 'error');
+                addResult('tvws object is undefined', 'error');
+            }
+        }
+
+        window.testBasicFunctions = function() {
+            addResult('Testing basic functions...', 'info');
+
+            if (typeof tvws === 'undefined') {
+                addResult('❌ tvws not available', 'error');
+                return;
+            }
+
+            try {
+                const client = tvws.createClient();
+                addResult('✅ createClient() works', 'success');
+
+                const client2 = tvws.connect();
+                addResult('✅ connect() works', 'success');
+
+                addResult(`✅ createChart: ${typeof client.createChart}`, 'success');
+                addResult(`✅ createQuote: ${typeof client.createQuote}`, 'success');
+                addResult(`✅ createReplay: ${typeof client.createReplay}`, 'success');
+                addResult(`✅ createStudy: ${typeof client.createStudy}`, 'success');
+
+                addResult('✅ All basic functions working!', 'success');
+
+            } catch (error) {
+                addResult(`❌ Basic functions error: ${error.message}`, 'error');
+            }
+        };
+
+        window.testSessions = function() {
+            addResult('Testing all session types...', 'info');
+
+            if (typeof tvws === 'undefined') {
+                addResult('❌ tvws not available', 'error');
+                return;
+            }
+
+            try {
+                const client = tvws.createClient();
+
+                // Chart session
+                const chart = client.createChart();
+                addResult(`✅ Chart session: ${chart.id} (${chart.sessionType})`, 'success');
+
+                // Quote session
+                const quote = client.createQuote();
+                addResult(`✅ Quote session: ${quote.id} (${quote.sessionType})`, 'success');
+
+                // Replay session
+                const replay = client.createReplay();
+                addResult(`✅ Replay session: ${replay.id} (${replay.sessionType})`, 'success');
+
+                // Study session (requires chart ID)
+                const study = client.createStudy('test-chart-id', { name: 'Test' });
+                addResult(`✅ Study session: ${study.id} (${study.sessionType})`, 'success');
+
+                addResult('✅ All session types working!', 'success');
+
+            } catch (error) {
+                addResult(`❌ Session creation error: ${error.message}`, 'error');
+            }
+        };
+
+        window.testChaining = function() {
+            addResult('Testing method chaining...', 'info');
+
+            if (typeof tvws === 'undefined') {
+                addResult('❌ tvws not available', 'error');
+                return;
+            }
+
+            try {
+                const client = tvws.createClient();
+
+                // Chart chaining
+                const chart = client.createChart()
+                    .setSymbol('BTCUSD')
+                    .setTimeframe('1D', 100);
+
+                addResult('✅ Chart method chaining works', 'success');
+
+                // Quote chaining
+                const quote = client.createQuote()
+                    .addSymbol('BTCUSD')
+                    .addSymbol('ETHUSD')
+                    .setFields(['price', 'volume']);
+
+                addResult('✅ Quote method chaining works', 'success');
+
+                // Event chaining
+                const chainedClient = client
+                    .on('test1', () => {})
+                    .on('test2', () => {})
+                    .on('test3', () => {});
+
+                addResult('✅ Event method chaining works', 'success');
+
+                addResult('✅ All method chaining working!', 'success');
+
+            } catch (error) {
+                addResult(`❌ Method chaining error: ${error.message}`, 'error');
+            }
+        };
+
+        window.testEvents = function() {
+            addResult('Testing event system...', 'info');
+
+            if (typeof tvws === 'undefined') {
+                addResult('❌ tvws not available', 'error');
+                return;
+            }
+
+            try {
+                const client = tvws.createClient();
+                let eventCount = 0;
+
+                client.on('test-event', () => {
+                    eventCount++;
+                });
+
+                client.emit('test-event', 'test data');
+
+                addResult(`✅ Event system: ${eventCount} events received`, 'success');
+
+                // Test EventEmitter
+                const emitter = new tvws.EventEmitter();
+                emitter.on('*', (event) => {
+                    eventCount++;
+                });
+
+                emitter.emit('wildcard-test');
+
+                addResult(`✅ EventEmitter with wildcards: ${eventCount} events`, 'success');
+
+                addResult('✅ Event system working!', 'success');
+
+            } catch (error) {
+                addResult(`❌ Event system error: ${error.message}`, 'error');
+            }
+        };
+
+        window.testInheritance = function() {
+            addResult('Testing class inheritance...', 'info');
+
+            if (typeof tvws === 'undefined') {
+                addResult('❌ tvws not available', 'error');
+                return;
+            }
+
+            try {
+                const client = tvws.createClient();
+                const chart = client.createChart();
+
+                // Test inheritance
+                addResult(`✅ Client is TVWSClient: ${client instanceof tvws.TVWSClient}`, 'success');
+                addResult(`✅ Chart is EventEmitter: ${chart instanceof tvws.EventEmitter}`, 'success');
+                addResult(`✅ Chart has EventEmitter methods: ${typeof chart.on === 'function'}`, 'success');
+
+                addResult('✅ Class inheritance working!', 'success');
+
+            } catch (error) {
+                addResult(`❌ Inheritance test error: ${error.message}`, 'error');
+            }
+        };
+
+        // Check if library is loaded after a short delay
+        setTimeout(showAvailableFunctions, 1000);
+
+        // Also check periodically
+        const checkInterval = setInterval(() => {
+            if (typeof tvws !== 'undefined') {
+                showAvailableFunctions();
+                clearInterval(checkInterval);
+            }
+        }, 500);
+
+        // Stop checking after 10 seconds
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            if (typeof tvws === 'undefined') {
+                updateStatus('❌ TVWS library failed to load', 'error');
+                addResult('Library load timeout - check console for errors', 'error');
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

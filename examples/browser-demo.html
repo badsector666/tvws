@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>TVWS Browser Example</title>
+        <style>
+            body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            .container {
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+                margin-bottom: 20px;
+            }
+            .status {
+                padding: 10px;
+                border-radius: 4px;
+                margin: 10px 0;
+            }
+            .success {
+                background-color: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .error {
+                background-color: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            .info {
+                background-color: #d1ecf1;
+                color: #0c5460;
+                border: 1px solid #bee5eb;
+            }
+            button {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin: 5px;
+            }
+            button:hover {
+                background-color: #0056b3;
+            }
+            pre {
+                background-color: #f8f9fa;
+                padding: 10px;
+                border-radius: 4px;
+                overflow-x: auto;
+                border: 1px solid #e9ecef;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 TVWS Browser Example</h1>
+            <p>Testing browser build with local dist/tvws.browser.js</p>
+            <div id="status" class="status info">Loading TVWS library...</div>
+        </div>
+
+        <div class="container">
+            <h2>Library Tests</h2>
+            <button onclick="testBasicFunctionality()">
+                Test Basic Functionality
+            </button>
+            <button onclick="testSessions()">Test Sessions</button>
+            <button onclick="testEvents()">Test Events</button>
+            <button onclick="testChart()">Test Chart Session</button>
+            <button onclick="testQuote()">Test Quote Session</button>
+        </div>
+
+        <div class="container">
+            <h2>Real-time Connection</h2>
+            <button onclick="connectToTradingView()">
+                Connect to TradingView
+            </button>
+            <button onclick="disconnect()">Disconnect</button>
+            <div id="connection-status" class="status info">Not connected</div>
+        </div>
+
+        <div class="container">
+            <h2>Test Results</h2>
+            <div id="results"></div>
+        </div>
+
+        <!-- Load the browser build -->
+        <script src="../dist/tvws.browser.js"></script>
+
+        <script>
+            let client = null;
+            let chartSession = null;
+            let quoteSession = null;
+
+            function updateStatus(message, type = "info") {
+                const statusEl = document.getElementById("status");
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+            }
+
+            function updateConnectionStatus(message, type = "info") {
+                const statusEl = document.getElementById("connection-status");
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+            }
+
+            function addResult(message, type = "success") {
+                const resultsEl = document.getElementById("results");
+                const div = document.createElement("div");
+                div.className = `status ${type}`;
+                div.textContent =
+                    new Date().toLocaleTimeString() + ": " + message;
+                resultsEl.appendChild(div);
+            }
+
+            function logLibraryInfo() {
+                if (typeof tvws !== "undefined") {
+                    updateStatus(
+                        "✅ TVWS library loaded successfully!",
+                        "success",
+                    );
+                    addResult(
+                        "Library version: tvws object available",
+                        "success",
+                    );
+
+                    // Show available functions
+                    const functions = Object.keys(tvws);
+                    addResult(
+                        `Available functions: ${functions.join(", ")}`,
+                        "info",
+                    );
+                } else {
+                    updateStatus("❌ TVWS library failed to load", "error");
+                    addResult("tvws object not found", "error");
+                }
+            }
+
+            function testBasicFunctionality() {
+                addResult("Testing basic functionality...", "info");
+
+                try {
+                    // Test createClient
+                    client = tvws.createClient({
+                        server: "data",
+                    });
+                    addResult("✅ createClient() works", "success");
+
+                    // Test connect function
+                    const client2 = tvws.connect({
+                        server: "data",
+                    });
+                    addResult("✅ connect() works", "success");
+
+                    // Test client methods
+                    addResult(
+                        `✅ createChart method: ${typeof client.createChart}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ createQuote method: ${typeof client.createQuote}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ createReplay method: ${typeof client.createReplay}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ createStudy method: ${typeof client.createStudy}`,
+                        "success",
+                    );
+
+                    // Test client properties
+                    addResult(
+                        `✅ Client isOpen property: ${typeof client.isOpen}`,
+                        "success",
+                    );
+                } catch (error) {
+                    addResult(
+                        `❌ Basic functionality error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function testSessions() {
+                addResult("Testing session creation...", "info");
+
+                try {
+                    if (!client) {
+                        client = tvws.createClient();
+                    }
+
+                    // Test chart session
+                    chartSession = client.createChart();
+                    addResult(
+                        `✅ Chart session created - Type: ${chartSession.sessionType}, ID: ${chartSession.id}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ Chart setSymbol method: ${typeof chartSession.setSymbol}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ Chart setTimeframe method: ${typeof chartSession.setTimeframe}`,
+                        "success",
+                    );
+
+                    // Test quote session
+                    quoteSession = client.createQuote();
+                    addResult(
+                        `✅ Quote session created - Type: ${quoteSession.sessionType}, ID: ${quoteSession.id}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ Quote addSymbol method: ${typeof quoteSession.addSymbol}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ Quote removeSymbol method: ${typeof quoteSession.removeSymbol}`,
+                        "success",
+                    );
+
+                    // Test replay session
+                    const replaySession = client.createReplay();
+                    addResult(
+                        `✅ Replay session created - Type: ${replaySession.sessionType}, ID: ${replaySession.id}`,
+                        "success",
+                    );
+
+                    addResult(
+                        "✅ All session types created successfully!",
+                        "success",
+                    );
+                } catch (error) {
+                    addResult(
+                        `❌ Session creation error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function testEvents() {
+                addResult("Testing event system...", "info");
+
+                try {
+                    if (!client) {
+                        client = tvws.createClient();
+                    }
+
+                    let eventCount = 0;
+
+                    // Test basic event listeners
+                    client.on("client:connected", () => {
+                        eventCount++;
+                        addResult(
+                            `✅ Connected event fired (${eventCount})`,
+                            "success",
+                        );
+                        updateConnectionStatus(
+                            "Connected to TradingView",
+                            "success",
+                        );
+                    });
+
+                    client.on("client:disconnected", () => {
+                        eventCount++;
+                        addResult(
+                            `✅ Disconnected event fired (${eventCount})`,
+                            "info",
+                        );
+                        updateConnectionStatus("Disconnected", "info");
+                    });
+
+                    client.on("client:error", (error) => {
+                        eventCount++;
+                        addResult(
+                            `✅ Error event fired: ${error.message || error}`,
+                            "error",
+                        );
+                        updateConnectionStatus(
+                            `Error: ${error.message || error}`,
+                            "error",
+                        );
+                    });
+
+                    client.on("client:ping", (pingId) => {
+                        eventCount++;
+                        addResult(`✅ Ping event received: ${pingId}`, "info");
+                    });
+
+                    addResult(
+                        `✅ Event listeners added (${eventCount} events tracked)`,
+                        "success",
+                    );
+                } catch (error) {
+                    addResult(
+                        `❌ Event system error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function testChart() {
+                addResult("Testing chart session functionality...", "info");
+
+                try {
+                    if (!chartSession) {
+                        if (!client) client = tvws.createClient();
+                        chartSession = client.createChart();
+                    }
+
+                    // Test method chaining
+                    const result = chartSession
+                        .setSymbol("BTCUSD")
+                        .setTimeframe("1D", 100);
+
+                    addResult("✅ Chart method chaining works", "success");
+
+                    // Test study attachment
+                    const study = chartSession.attachStudy({
+                        name: "Volume",
+                        inputs: {},
+                    });
+                    addResult(
+                        `✅ Study attached - ID: ${study.studyId}`,
+                        "success",
+                    );
+
+                    // Test data retrieval methods
+                    addResult(
+                        `✅ getInfos method: ${typeof chartSession.getInfos}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ getLatestPrices method: ${typeof chartSession.getLatestPrices}`,
+                        "success",
+                    );
+
+                    addResult("✅ Chart session tests completed!", "success");
+                } catch (error) {
+                    addResult(
+                        `❌ Chart session error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function testQuote() {
+                addResult("Testing quote session functionality...", "info");
+
+                try {
+                    if (!quoteSession) {
+                        if (!client) client = tvws.createClient();
+                        quoteSession = client.createQuote();
+                    }
+
+                    // Test adding symbols
+                    const result = quoteSession
+                        .addSymbol("BTCUSD")
+                        .addSymbol("ETHUSD");
+
+                    addResult("✅ Quote method chaining works", "success");
+
+                    // Test setting fields
+                    quoteSession.setFields(["price", "volume", "change"]);
+                    addResult("✅ Quote fields set", "success");
+
+                    // Test data retrieval methods
+                    addResult(
+                        `✅ getAllSymbols method: ${quoteSession.getAllSymbols().length} symbols`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ getQuoteStatus method: ${typeof quoteSession.getQuoteStatus}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ getSymbolData method: ${typeof quoteSession.getSymbolData}`,
+                        "success",
+                    );
+
+                    addResult("✅ Quote session tests completed!", "success");
+                } catch (error) {
+                    addResult(
+                        `❌ Quote session error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function connectToTradingView() {
+                addResult("Connecting to TradingView...", "info");
+                updateConnectionStatus("Connecting...", "info");
+
+                try {
+                    if (!client) {
+                        client = tvws.createClient();
+                        testEvents(); // Add event listeners if not already done
+                    }
+
+                    // The connection happens automatically in the constructor
+                    addResult("Connection attempt initiated", "info");
+                } catch (error) {
+                    addResult(`❌ Connection error: ${error.message}`, "error");
+                    updateConnectionStatus(
+                        `Connection failed: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function disconnect() {
+                addResult("Disconnecting...", "info");
+
+                try {
+                    if (client) {
+                        client.close();
+                        addResult("✅ Disconnect initiated", "success");
+                    } else {
+                        addResult("No active connection to close", "info");
+                    }
+                } catch (error) {
+                    addResult(`❌ Disconnect error: ${error.message}`, "error");
+                }
+            }
+
+            // Initialize when page loads
+            window.addEventListener("load", () => {
+                setTimeout(logLibraryInfo, 100);
+            });
+        </script>
+    </body>
+</html>

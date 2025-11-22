@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>TVWS ESM Browser Example</title>
+        <style>
+            body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            .container {
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+                margin-bottom: 20px;
+            }
+            .status {
+                padding: 10px;
+                border-radius: 4px;
+                margin: 10px 0;
+            }
+            .success {
+                background-color: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .error {
+                background-color: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            .info {
+                background-color: #d1ecf1;
+                color: #0c5460;
+                border: 1px solid #bee5eb;
+            }
+            button {
+                background-color: #28a745;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin: 5px;
+            }
+            button:hover {
+                background-color: #218838;
+            }
+            pre {
+                background-color: #f8f9fa;
+                padding: 10px;
+                border-radius: 4px;
+                overflow-x: auto;
+                border: 1px solid #e9ecef;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 TVWS ESM Browser Example</h1>
+            <p>Testing ES Module build with local dist/tvws.esm.js</p>
+            <div id="status" class="status info">
+                Loading TVWS ESM library...
+            </div>
+        </div>
+
+        <div class="container">
+            <h2>Module Tests</h2>
+            <button onclick="testESMImport()">Test ESM Import</button>
+            <button onclick="testClasses()">Test Classes</button>
+            <button onclick="testInstances()">Test Instances</button>
+            <button onclick="testMethods()">Test Methods</button>
+        </div>
+
+        <div class="container">
+            <h2>Advanced Features</h2>
+            <button onclick="testEventSystem()">Test Event System</button>
+            <button onclick="testInheritance()">Test Class Inheritance</button>
+            <button onclick="testMethodChaining()">Test Method Chaining</button>
+        </div>
+
+        <div class="container">
+            <h2>Test Results</h2>
+            <div id="results"></div>
+        </div>
+
+        <script type="module">
+            let client = null;
+            let createClient = null;
+            let connect = null;
+            let EventEmitter = null;
+            let TVWSClient = null;
+            let ChartSession = null;
+
+            function updateStatus(message, type = "info") {
+                const statusEl = document.getElementById("status");
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+            }
+
+            function addResult(message, type = "success") {
+                const resultsEl = document.getElementById("results");
+                const div = document.createElement("div");
+                div.className = `status ${type}`;
+                div.textContent =
+                    new Date().toLocaleTimeString() + ": " + message;
+                resultsEl.appendChild(div);
+            }
+
+            // ESM Import test
+            async function testESMImport() {
+                addResult("Testing ESM import...", "info");
+
+                try {
+                    // Import from local ESM file
+                    const tvws = await import("../dist/tvws.esm.js");
+
+                    // Destructure imports
+                    ({
+                        createClient,
+                        connect,
+                        EventEmitter,
+                        TVWSClient,
+                        ChartSession,
+                    } = tvws);
+
+                    addResult("✅ ESM import successful", "success");
+                    addResult(
+                        `✅ createClient: ${typeof createClient}`,
+                        "success",
+                    );
+                    addResult(`✅ connect: ${typeof connect}`, "success");
+                    addResult(
+                        `✅ EventEmitter: ${typeof EventEmitter}`,
+                        "success",
+                    );
+                    addResult(`✅ TVWSClient: ${typeof TVWSClient}`, "success");
+                    addResult(
+                        `✅ ChartSession: ${typeof ChartSession}`,
+                        "success",
+                    );
+
+                    // Check all exports
+                    const exports = Object.keys(tvws);
+                    addResult(`📦 Total exports: ${exports.length}`, "info");
+                    addResult(`📦 Export names: ${exports.join(", ")}`, "info");
+
+                    updateStatus(
+                        "✅ ESM library loaded successfully!",
+                        "success",
+                    );
+                } catch (error) {
+                    addResult(
+                        `❌ ESM import failed: ${error.message}`,
+                        "error",
+                    );
+                    updateStatus("❌ ESM import failed", "error");
+                    console.error("ESM import error:", error);
+                }
+            }
+
+            function testClasses() {
+                addResult("Testing class constructors...", "info");
+
+                try {
+                    if (!TVWSClient || !ChartSession || !EventEmitter) {
+                        addResult("❌ Classes not imported yet", "error");
+                        return;
+                    }
+
+                    // Test EventEmitter
+                    const emitter = new EventEmitter();
+                    addResult("✅ EventEmitter instantiated", "success");
+                    addResult(
+                        `✅ EventEmitter.on method: ${typeof emitter.on}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ EventEmitter.emit method: ${typeof emitter.emit}`,
+                        "success",
+                    );
+
+                    // Test TVWSClient
+                    client = new TVWSClient({ server: "data" });
+                    addResult("✅ TVWSClient instantiated", "success");
+                    addResult(
+                        `✅ TVWSClient.createChart: ${typeof client.createChart}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ TVWSClient.isOpen: ${typeof client.isOpen}`,
+                        "success",
+                    );
+
+                    addResult("✅ All class constructors working", "success");
+                } catch (error) {
+                    addResult(
+                        `❌ Class constructor error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function testInstances() {
+                addResult("Testing instance creation...", "info");
+
+                try {
+                    if (!createClient || !connect) {
+                        addResult(
+                            "❌ Factory functions not imported yet",
+                            "error",
+                        );
+                        return;
+                    }
+
+                    // Test createClient factory
+                    const client1 = createClient({ server: "data" });
+                    addResult("✅ createClient() instance created", "success");
+                    addResult(
+                        `✅ Client type: ${client1.constructor.name}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ Is TVWSClient instance: ${client1 instanceof TVWSClient}`,
+                        "success",
+                    );
+
+                    // Test connect factory
+                    const client2 = connect({ server: "data" });
+                    addResult("✅ connect() instance created", "success");
+                    addResult(
+                        `✅ Client type: ${client2.constructor.name}`,
+                        "success",
+                    );
+
+                    // Test session creation
+                    const chart = client1.createChart();
+                    addResult("✅ Chart session created", "success");
+                    addResult(
+                        `✅ Chart type: ${chart.constructor.name}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ Is ChartSession instance: ${chart instanceof ChartSession}`,
+                        "success",
+                    );
+
+                    const quote = client2.createQuote();
+                    addResult("✅ Quote session created", "success");
+                    addResult(
+                        `✅ Quote session type: ${quote.sessionType}`,
+                        "success",
+                    );
+
+                    addResult(
+                        "✅ All instances created successfully",
+                        "success",
+                    );
+                } catch (error) {
+                    addResult(
+                        `❌ Instance creation error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function testMethods() {
+                addResult("Testing method availability...", "info");
+
+                try {
+                    if (!client) {
+                        addResult("❌ No client instance available", "error");
+                        return;
+                    }
+
+                    // Test client methods
+                    const clientMethods = [
+                        "createChart",
+                        "createQuote",
+                        "createReplay",
+                        "createStudy",
+                        "on",
+                        "off",
+                        "emit",
+                        "onConnected",
+                        "onError",
+                        "onPing",
+                    ];
+
+                    clientMethods.forEach((method) => {
+                        const exists = typeof client[method] === "function";
+                        addResult(
+                            `${exists ? "✅" : "❌"} client.${method}: ${typeof client[method]}`,
+                            exists ? "success" : "error",
+                        );
+                    });
+
+                    // Test chart methods
+                    const chart = client.createChart();
+                    const chartMethods = [
+                        "setSymbol",
+                        "setTimeframe",
+                        "getLatestPrices",
+                        "getInfos",
+                        "attachStudy",
+                        "removeStudy",
+                        "onData",
+                        "onError",
+                    ];
+
+                    chartMethods.forEach((method) => {
+                        const exists = typeof chart[method] === "function";
+                        addResult(
+                            `${exists ? "✅" : "❌"} chart.${method}: ${typeof chart[method]}`,
+                            exists ? "success" : "error",
+                        );
+                    });
+
+                    addResult("✅ Method testing completed", "success");
+                } catch (error) {
+                    addResult(
+                        `❌ Method testing error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function testEventSystem() {
+                addResult("Testing event system...", "info");
+
+                try {
+                    if (!client || !EventEmitter) {
+                        addResult("❌ Event system not available", "error");
+                        return;
+                    }
+
+                    let eventCount = 0;
+
+                    // Test basic event handling
+                    client.on("test-event", (data) => {
+                        eventCount++;
+                        addResult(`✅ Test event received: ${data}`, "success");
+                    });
+
+                    // Emit test event
+                    client.emit("test-event", "Hello from ESM!");
+
+                    // Test wildcard events
+                    const emitter = new EventEmitter();
+                    emitter.on("*", (event, data) => {
+                        eventCount++;
+                        addResult(
+                            `✅ Wildcard event: ${event} = ${data}`,
+                            "success",
+                        );
+                    });
+
+                    emitter.emit("test-wildcard", "wildcard-data");
+
+                    // Test hierarchical events
+                    emitter.on("chart:*", (event, data) => {
+                        eventCount++;
+                        addResult(
+                            `✅ Hierarchical event: ${event} = ${data}`,
+                            "success",
+                        );
+                    });
+
+                    emitter.emit("chart:update", "hierarchical-data");
+
+                    setTimeout(() => {
+                        addResult(
+                            `✅ Event system test completed (${eventCount} events)`,
+                            "success",
+                        );
+                    }, 100);
+                } catch (error) {
+                    addResult(
+                        `❌ Event system error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function testInheritance() {
+                addResult("Testing class inheritance...", "info");
+
+                try {
+                    if (!client || !ChartSession || !TVWSClient) {
+                        addResult(
+                            "❌ Classes not available for inheritance test",
+                            "error",
+                        );
+                        return;
+                    }
+
+                    const chart = client.createChart();
+
+                    // Test that ChartSession extends BaseSession
+                    addResult(
+                        `✅ ChartSession sessionType: ${chart.sessionType}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ ChartSession has client property: ${!!chart.client}`,
+                        "success",
+                    );
+
+                    // Test that it has EventEmitter methods
+                    addResult(
+                        `✅ ChartSession has on method: ${typeof chart.on === "function"}`,
+                        "success",
+                    );
+                    addResult(
+                        `✅ ChartSession has emit method: ${typeof chart.emit === "function"}`,
+                        "success",
+                    );
+
+                    // Test inheritance chain
+                    addResult(
+                        `✅ ChartSession is EventEmitter: ${chart instanceof EventEmitter}`,
+                        "success",
+                    );
+
+                    addResult("✅ Inheritance test completed", "success");
+                } catch (error) {
+                    addResult(
+                        `❌ Inheritance test error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            function testMethodChaining() {
+                addResult("Testing method chaining...", "info");
+
+                try {
+                    if (!client) {
+                        addResult(
+                            "❌ Client not available for chaining test",
+                            "error",
+                        );
+                        return;
+                    }
+
+                    // Test client event chaining
+                    const chainedClient = client
+                        .on("test1", () => {})
+                        .on("test2", () => {})
+                        .on("test3", () => {});
+
+                    addResult(
+                        `✅ Client event chaining: ${chainedClient === client}`,
+                        "success",
+                    );
+
+                    // Test chart method chaining
+                    const chart = client.createChart();
+                    const chainedChart = chart
+                        .setSymbol("BTCUSD")
+                        .setTimeframe("1D", 100);
+
+                    addResult(
+                        `✅ Chart method chaining: ${chainedChart === chart}`,
+                        "success",
+                    );
+
+                    // Test quote session chaining
+                    const quote = client.createQuote();
+                    const chainedQuote = quote
+                        .addSymbol("BTCUSD")
+                        .addSymbol("ETHUSD")
+                        .setFields(["price", "volume"]);
+
+                    addResult(
+                        `✅ Quote method chaining: ${chainedQuote === quote}`,
+                        "success",
+                    );
+
+                    addResult("✅ Method chaining test completed", "success");
+                } catch (error) {
+                    addResult(
+                        `❌ Method chaining error: ${error.message}`,
+                        "error",
+                    );
+                }
+            }
+
+            // Make functions globally available
+            window.testESMImport = testESMImport;
+            window.testClasses = testClasses;
+            window.testInstances = testInstances;
+            window.testMethods = testMethods;
+            window.testEventSystem = testEventSystem;
+            window.testInheritance = testInheritance;
+            window.testMethodChaining = testMethodChaining;
+
+            // Auto-test ESM import on load
+            window.addEventListener("load", () => {
+                setTimeout(testESMImport, 100);
+            });
+        </script>
+    </body>
+</html>

@@ -1,3 +1,7 @@
+// Hierarchical WebSocket Event System for TradingView API
+// Compressed, reactive, and composable implementation
+
+// Base EventEmitter with hierarchical namespacing and wildcard support
 type EventPattern = string;
 type EventHandler<T = any> = (event?: string, data?: T) => void;
 
@@ -5,6 +9,7 @@ class EventEmitter {
   private listeners = new Map<EventPattern, Set<EventHandler>>();
   private wildcards: Array<{ pattern: string; handler: EventHandler }> = [];
 
+  // Event subscription with method chaining
   on<T = any>(event: EventPattern, handler: EventHandler<T>): this {
     if (event.includes("*")) {
       this.wildcards.push({ pattern: event, handler });
@@ -14,6 +19,8 @@ class EventEmitter {
     }
     return this;
   }
+
+  // One-time event subscription
   once<T = any>(event: EventPattern, handler: EventHandler<T>): this {
     const wrapper = (e?: string, d?: T) => {
       handler(e, d);
@@ -22,6 +29,7 @@ class EventEmitter {
     return this.on(event, wrapper);
   }
 
+  // Event unsubscription
   off(event: EventPattern, handler: EventHandler): this {
     const handlers = this.listeners.get(event);
     if (handlers) handlers.delete(handler);
@@ -29,50 +37,64 @@ class EventEmitter {
     return this;
   }
 
+  // Event emission with hierarchical routing
   emit<T = any>(event: EventPattern, data?: T): void {
+    // Direct listeners
     const handlers = this.listeners.get(event);
     if (handlers)
       handlers.forEach((h) => {
         try {
           h(event, data);
-        } catch (e) {}
+        } catch (e) {
+          console.error(`Event error: ${event}`, e);
+        }
       });
 
+    // Wildcard pattern matching
     this.wildcards.forEach(({ pattern, handler }) => {
       if (this.matchPattern(event, pattern)) {
         try {
           handler(event, data);
-        } catch (e) {}
+        } catch (e) {
+          console.error(`Wildcard error: ${pattern}`, e);
+        }
       }
     });
   }
 
+  // Pattern matching for wildcards
   private matchPattern(event: string, pattern: string): boolean {
     const eParts = event.split(":");
     const pParts = pattern.split(":");
 
+    // Handle patterns that end with ** to match any remaining parts
     const hasDoubleWildcard = pParts[pParts.length - 1] === "**";
 
     if (hasDoubleWildcard) {
+      // Remove the ** and check if event starts with pattern
       const basePattern = pParts.slice(0, -1).join(":");
       const eventBase = eParts.slice(0, pParts.length - 1).join(":");
       return basePattern === eventBase;
     }
 
+    // Handle patterns like chart:* matching chart:*:* or chart:*:*:* (variable length)
     if (eParts.length > pParts.length && pParts[pParts.length - 1] === "*") {
+      // Check if all pattern parts except the last * match exactly
       const basePattern = pParts.slice(0, -1);
       const eventBase = eParts.slice(0, basePattern.length);
       return basePattern.every((part, i) => part === eventBase[i]);
     }
 
+    // Exact segment count matching (original behavior)
     if (eParts.length !== pParts.length) return false;
     return pParts.every((part, i) => part === "*" || part === eParts[i]);
   }
 }
 
+// Packet types and interfaces
 interface TWPacket {
-  m?: string;
-  p?: any[];
+  m?: string; // method type
+  p?: any[]; // parameters [session_id, ...data]
 }
 
 interface SocketSession {
@@ -87,8 +109,10 @@ interface SocketSession {
   via: string;
 }
 
+// Session types
 type SessionType = "chart" | "quote" | "replay" | "study";
 
+// Base session class
 abstract class BaseSession extends EventEmitter {
   abstract readonly sessionType: SessionType;
   abstract readonly id: string;
@@ -99,6 +123,7 @@ abstract class BaseSession extends EventEmitter {
 
   abstract handlePacket(packet: TWPacket): void;
 
+  // Method chaining for event handlers
   onData<T = any>(handler: EventHandler<T>): this {
     return this.on("data", handler);
   }
@@ -109,6 +134,8 @@ abstract class BaseSession extends EventEmitter {
 }
 
 type ErrorHandler = EventHandler<string | Error>;
+
+// Chart session implementation
 class ChartSession extends BaseSession {
   readonly sessionType = "chart" as const;
   readonly id: string;
@@ -180,7 +207,7 @@ class ChartSession extends BaseSession {
     }
 
     // Handle study updates
-    this.studies.forEach((_, studyId) => {
+    this.studies.forEach((study, studyId) => {
       if (updateData?.[studyId]) {
         changes.push(`study:${studyId}`);
       }
@@ -223,7 +250,7 @@ class ChartSession extends BaseSession {
     return this.infos;
   }
 
-  // Study management methods
+  // Study management methods with chaining
   attachStudy(studyConfig: any): StudySession {
     const study = new StudySession(this.client, this.id, studyConfig);
     this.studies.set(study.studyId, study);
@@ -334,10 +361,12 @@ class ReplaySession extends BaseSession {
     }
   }
 
-  // Replay control methods
+  // Replay control methods with method chaining
   replayGo(point: number): this {
     const commandId = this.commandId++;
-    this.replayOKCallbacks.set(commandId, () => {});
+    this.replayOKCallbacks.set(commandId, () => {
+      // Command completed successfully
+    });
     this.client.send("replay_go", [this.id, commandId, point]);
     return this;
   }
@@ -457,6 +486,7 @@ class StudySession extends BaseSession {
   }
 }
 
+// Quote session implementation
 class QuoteSession extends BaseSession {
   readonly sessionType = "quote" as const;
   readonly id: string;
@@ -562,6 +592,7 @@ class TVWSClient extends EventEmitter {
   private sessions = new Map<string, BaseSession>();
   private sendQueue: string[] = [];
   private logged = false;
+  private sessionCallbacks = new Map<SessionType, Set<EventHandler>>();
 
   constructor(private options: any = {}) {
     super();
@@ -684,7 +715,7 @@ class TVWSClient extends EventEmitter {
     this.sessions.delete(sessionId);
   }
 
-  // Session factory
+  // Session factory with method chaining
   createChart(): ChartSession {
     return new ChartSession(this);
   }
@@ -701,7 +732,7 @@ class TVWSClient extends EventEmitter {
     return new StudySession(this, chartId, studyConfig);
   }
 
-  // Convenience methods
+  // Convenience methods with chaining
   onConnected(handler: EventHandler): this {
     return this.on("client:connected", handler);
   }
@@ -741,7 +772,7 @@ export function createClient(options?: any): TVWSClient {
   return new TVWSClient(options);
 }
 
-// Convenience export
+// Convenience export for direct usage
 export function connect(options?: any): TVWSClient {
   return createClient(options);
 }
@@ -765,9 +796,11 @@ export type {
   TWPacket,
 };
 
-// Global browser exposure
+// Global browser exposure (will be handled by build script)
 declare global {
   interface Window {
     tvws?: { createClient: typeof createClient; connect: typeof connect };
   }
 }
+
+export default { createClient, connect };

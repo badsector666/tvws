@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TVWS TradingView Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .log-container {
+            background: #1e1e1e;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .log-tvws { color: #4ec9b0; }
+        .log-error { color: #f07178; }
+        .log-info { color: #89ddff; }
+        .log-warning { color: #ffcb6b; }
+        .log-success { color: #c3e88d; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-value { font-size: 24px; font-weight: bold; color: #007bff; }
+        .stat-label { color: #6c757d; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 TVWS TradingView Connection Test</h1>
+        <p>This test shows <strong>actual TradingView connections</strong> vs. Bun development server connections.</p>
+        <div id="status" class="status info">Ready to test TradingView connections...</div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="connection-count">0</div>
+                <div class="stat-label">Connections Attempted</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="success-count">0</div>
+                <div class="stat-label">Successful Events</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="error-count">0</div>
+                <div class="stat-label">Connection Errors</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="session-count">0</div>
+                <div class="stat-label">Sessions Created</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Connection Tests</h2>
+        <button onclick="testRealConnection()" id="connect-btn">🚀 Connect to TradingView</button>
+        <button onclick="testMultipleConnections()" id="multi-btn">🔄 Test Multiple Connections</button>
+        <button onclick="clearLogs()" id="clear-btn">🧹 Clear Logs</button>
+        <button onclick="showBunLogs()" id="bun-btn">📦 Show Bun Development Logs</button>
+    </div>
+
+    <div class="container">
+        <h2>TVWS Connection Logs</h2>
+        <p><strong>Green logs = TradingView connections | Red logs = Connection errors | Blue logs = Info</strong></p>
+        <div id="logs" class="log-container">Ready to log TradingView connections...</div>
+    </div>
+
+    <script type="module" src="./tvws-bundle.js"></script>
+
+    <script>
+        let connectionCount = 0;
+        let successCount = 0;
+        let errorCount = 0;
+        let sessionCount = 0;
+        let clients = [];
+
+        function updateStats() {
+            document.getElementById('connection-count').textContent = connectionCount;
+            document.getElementById('success-count').textContent = successCount;
+            document.getElementById('error-count').textContent = errorCount;
+            document.getElementById('session-count').textContent = sessionCount;
+        }
+
+        function log(message, type = 'info') {
+            const logsEl = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = `log-${type}`;
+
+            const logEntry = document.createElement('div');
+            logEntry.className = className;
+            logEntry.textContent = `[${timestamp}] TVWS: ${message}`;
+
+            logsEl.appendChild(logEntry);
+            logsEl.scrollTop = logsEl.scrollHeight;
+
+            // Update stats
+            if (type === 'success') successCount++;
+            if (type === 'error') errorCount++;
+            updateStats();
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        window.testRealConnection = function() {
+            if (typeof tvws === 'undefined') {
+                log('❌ TVWS library not loaded', 'error');
+                return;
+            }
+
+            log('🚀 Creating client and connecting to TradingView...', 'info');
+            updateStatus('Connecting to TradingView...', 'info');
+
+            const client = tvws.createClient({
+                server: 'data' // Connect to data.tradingview.com
+            });
+
+            clients.push(client);
+            connectionCount++;
+
+            // Track actual TradingView events
+            client.on('client:connected', () => {
+                log('✅ Connected to TradingView WebSocket server', 'success');
+                updateStatus('✅ Connected to TradingView!', 'success');
+            });
+
+            client.on('client:logged', (authData) => {
+                log('✅ Authenticated with TradingView successfully', 'success');
+                log(`📋 Session data: ${JSON.stringify(authData, null, 2).substring(0, 200)}...`, 'info');
+            });
+
+            client.on('client:ping', (pingId) => {
+                log(`📡 Received TradingView ping: ${pingId}`, 'success');
+            });
+
+            client.on('client:error', (error) => {
+                log(`❌ TradingView connection error: ${error.message || error}`, 'error');
+                updateStatus('❌ TradingView connection failed', 'error');
+            });
+
+            client.on('client:disconnected', () => {
+                log('🔌 Disconnected from TradingView', 'warning');
+                updateStatus('🔌 Disconnected from TradingView', 'warning');
+            });
+
+            client.on('client:data', (packet) => {
+                log(`📊 Received TradingView data: ${JSON.stringify(packet).substring(0, 100)}...`, 'success');
+            });
+
+            // Create some sessions to trigger more TradingView communication
+            setTimeout(() => {
+                try {
+                    log('📊 Creating chart session...', 'info');
+                    const chart = client.createChart();
+                    chart.setSymbol('BTCUSD', { adjustment: 'splits' });
+                    chart.setTimeframe('1D', 100);
+                    sessionCount++;
+                    log(`✅ Chart session created: ${chart.id}`, 'success');
+
+                    chart.on('symbol_loaded', () => {
+                        log(`📈 Symbol data loaded for chart: ${chart.id}`, 'success');
+                    });
+
+                    chart.on('update', () => {
+                        log(`📊 Chart data update received: ${chart.id}`, 'success');
+                    });
+
+                } catch (error) {
+                    log(`❌ Chart session error: ${error.message}`, 'error');
+                }
+            }, 2000);
+
+            setTimeout(() => {
+                try {
+                    log('💰 Creating quote session...', 'info');
+                    const quote = client.createQuote();
+                    quote.addSymbol('EURUSD');
+                    quote.addSymbol('GBPUSD');
+                    sessionCount++;
+                    log(`✅ Quote session created: ${quote.id}`, 'success');
+
+                    quote.on('quote_completed', (symbolKey) => {
+                        log(`💰 Quote session ready: ${symbolKey}`, 'success');
+                    });
+
+                } catch (error) {
+                    log(`❌ Quote session error: ${error.message}`, 'error');
+                }
+            }, 3000);
+        };
+
+        window.testMultipleConnections = function() {
+            log('🔄 Testing multiple connections to different TradingView servers...', 'info');
+
+            const servers = ['data', 'charting', 'parser1'];
+
+            servers.forEach((server, index) => {
+                setTimeout(() => {
+                    log(`🌐 Connecting to ${server}.tradingview.com...`, 'info');
+
+                    const client = tvws.createClient({ server });
+                    clients.push(client);
+                    connectionCount++;
+
+                    client.on('client:connected', () => {
+                        log(`✅ Connected to ${server}.tradingview.com`, 'success');
+                    });
+
+                    client.on('client:error', (error) => {
+                        log(`❌ Failed to connect to ${server}.tradingview.com: ${error.message}`, 'error');
+                    });
+
+                }, index * 1000);
+            });
+        };
+
+        window.clearLogs = function() {
+            document.getElementById('logs').innerHTML = 'Logs cleared...';
+            connectionCount = 0;
+            successCount = 0;
+            errorCount = 0;
+            sessionCount = 0;
+            updateStats();
+        };
+
+        window.showBunLogs = function() {
+            log('📦 Note: Messages about "localhost:3000/_bun/hmr" are BUN DEVELOPMENT SERVER logs', 'warning');
+            log('📦 These are NOT TradingView connections - they are Bun hot-reloading', 'warning');
+            log('📦 TradingView connections will show as "data.tradingview.com" or similar', 'warning');
+            log('📦 Look for GREEN logs for actual TradingView communication', 'warning');
+        };
+
+        // Initialize
+        setTimeout(() => {
+            if (typeof tvws !== 'undefined') {
+                log('✅ TVWS library loaded successfully', 'success');
+                updateStatus('✅ Ready to test TradingView connections', 'success');
+            } else {
+                log('❌ TVWS library not loaded', 'error');
+                updateStatus('❌ TVWS library not available', 'error');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

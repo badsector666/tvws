@@ -1,0 +1,247 @@
+type Subscriber = (event: TradingviewEvent) => void;
+type Unsubscriber = () => void;
+
+type MessageType = "ping" | "session" | "event";
+
+interface RawCandle {
+  i: number;
+  v: number[];
+}
+
+export interface Candle {
+  timestamp: number;
+  high: number;
+  low: number;
+  open: number;
+  close: number;
+  volume: number;
+}
+
+interface MessagePayload {
+  type: MessageType;
+  data: any;
+}
+
+export interface TradingviewConnection {
+  subscribe: (handler: Subscriber) => Unsubscriber;
+  send: (name: string, params: any[]) => void;
+  close: () => Promise<void>;
+}
+
+interface ConnectionOptions {
+  sessionId?: string;
+  endpoint?: string;
+  timeout?: number;
+}
+
+interface TradingviewEvent {
+  name: string;
+  params: any[];
+}
+
+// === UTILITY FUNCTIONS ===
+const generateSessionId = (prefix = "cs") =>
+  `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+const processRawCandles = (rawCandles: RawCandle[]): Candle[] =>
+  rawCandles.map((c) => ({
+    timestamp: c.v[0],
+    open: c.v[1],
+    high: c.v[2],
+    low: c.v[3],
+    close: c.v[4],
+    volume: c.v[5],
+  }));
+
+// === CORE WEBSOCKET CLIENT ===
+export interface TradingViewClient {
+  connect(options?: ConnectionOptions): Promise<TradingViewClient>;
+  disconnect(): Promise<void>;
+  emit(method: string, params: any[]): void;
+  subscribe(
+    event: string,
+    handler: Subscriber | ((e: TradingviewEvent) => boolean),
+  ): Unsubscriber;
+  isConnected(): boolean;
+}
+
+class TradingViewClientImpl implements TradingViewClient {
+  connection: TradingviewConnection | null = null;
+  private subscribers: Map<string, Set<Subscriber>> = new Map();
+
+  async connect(options: ConnectionOptions = {}): Promise<TradingViewClient> {
+    const wsUrl =
+      options.endpoint || "wss://data.tradingview.com/socket.io/websocket";
+    this.connection = await this.createConnection(wsUrl, options);
+    return this;
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.connection) {
+      await this.connection.close();
+      this.connection = null;
+    }
+    this.subscribers.clear();
+  }
+
+  emit(method: string, params: any[]): void {
+    if (!this.connection) throw new Error("Not connected");
+    this.connection.send(method, params);
+  }
+
+  subscribe(
+    event: string,
+    handler: Subscriber | ((e: TradingviewEvent) => boolean),
+  ): Unsubscriber {
+    if (!this.subscribers.has(event)) {
+      this.subscribers.set(event, new Set());
+    }
+
+    const actualHandler = typeof handler === "function" ? handler : () => {};
+    this.subscribers.get(event)!.add(actualHandler);
+
+    return () => {
+      const handlers = this.subscribers.get(event);
+      if (handlers) {
+        handlers.delete(actualHandler);
+        if (handlers.size === 0) {
+          this.subscribers.delete(event);
+        }
+      }
+    };
+  }
+
+  isConnected(): boolean {
+    return this.connection !== null;
+  }
+
+  private async createConnection(
+    wsUrl: string,
+    options: ConnectionOptions,
+  ): Promise<TradingviewConnection> {
+    let token = "unauthorized_user_token";
+
+    if (options.sessionId) {
+      try {
+        const resp = await fetch("https://www.tradingview.com/disclaimer/", {
+          method: "GET",
+          headers: { Cookie: `sessionid=${options.sessionId}` },
+          credentials: "include",
+        });
+        const text = await resp.text();
+        const match = text.match(/"auth_token":"(.+?)"/);
+        if (match) token = match[1];
+      } catch (error) {
+        console.warn("Authentication failed, using unauthorized token:", error);
+      }
+    }
+
+    const connection = new WebSocket(wsUrl);
+    const subscribers: Set<Subscriber> = new Set();
+
+    const subscribe = (handler: Subscriber): Unsubscriber => {
+      subscribers.add(handler);
+      return () => subscribers.delete(handler);
+    };
+
+    const send = (name: string, params: any[]) => {
+      const data = JSON.stringify({ m: name, p: params });
+      const message = "~m~" + data.length + "~m~" + data;
+      connection.send(message);
+    };
+
+    const close = async () => {
+      subscribers.clear();
+      return new Promise<void>((resolve, reject) => {
+        connection.addEventListener("close", () => resolve());
+        connection.addEventListener("error", (error) => reject(error));
+        connection.close();
+      });
+    };
+
+    return new Promise<TradingviewConnection>((resolve, reject) => {
+      const connectionTimeout = setTimeout(() => {
+        if (connection.readyState === WebSocket.CONNECTING) {
+          connection.close();
+          reject(new Error("Connection timeout"));
+        }
+      }, options.timeout || 10000);
+
+      connection.addEventListener("error", (error: Event) => {
+        clearTimeout(connectionTimeout);
+        reject(error);
+      });
+
+      connection.addEventListener("message", (event: MessageEvent) => {
+        try {
+          const message = event.data;
+          const payloads = this.parseMessage(message.toString());
+
+          for (const payload of payloads) {
+            switch (payload.type) {
+              case "ping":
+                connection.send(payload.data);
+                break;
+              case "session":
+                clearTimeout(connectionTimeout);
+                send("set_auth_token", [token]);
+                resolve({ subscribe, send, close });
+                break;
+              case "event":
+                const tradingEvent = {
+                  name: payload.data.m,
+                  params: payload.data.p,
+                };
+
+                // Forward to global subscribers
+                subscribers.forEach((handler) => handler(tradingEvent));
+
+                // Forward to event-specific subscribers
+                const eventHandlers = this.subscribers.get(tradingEvent.name);
+                if (eventHandlers) {
+                  eventHandlers.forEach((handler) => handler(tradingEvent));
+                }
+                break;
+            }
+          }
+        } catch (error) {
+          clearTimeout(connectionTimeout);
+          reject(error);
+        }
+      });
+    });
+  }
+
+  private parseMessage(message: string): MessagePayload[] {
+    if (message.length === 0) return [];
+
+    const events = message
+      .toString()
+      .split(/~m~\d+~m~/)
+      .slice(1);
+    return events.map((event) => {
+      if (event.substring(0, 3) === "~h~") {
+        return { type: "ping", data: `~m~${event.length}~m~${event}` };
+      }
+      const parsed = JSON.parse(event);
+      if (parsed["session_id"]) {
+        return { type: "session", data: parsed };
+      }
+      return { type: "event", data: parsed };
+    });
+  }
+}
+
+// === FACTORY FUNCTION ===
+export function createClient(): TradingViewClient {
+  return new TradingViewClientImpl();
+}
+
+// === LEGACY COMPATIBILITY (MINIMAL) ===
+export const connect = async (
+  options: ConnectionOptions = {},
+): Promise<TradingviewConnection> => {
+  const client = createClient() as any;
+  await client.connect(options);
+  return client.connection;
+};

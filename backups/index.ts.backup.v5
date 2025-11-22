@@ -1,3 +1,7 @@
+// Hierarchical WebSocket Event System for TradingView API
+// Compressed, reactive, and composable implementation
+
+// Base EventEmitter with hierarchical namespacing and wildcard support
 type EventPattern = string;
 type EventHandler<T = any> = (event?: string, data?: T) => void;
 
@@ -5,6 +9,7 @@ class EventEmitter {
   private listeners = new Map<EventPattern, Set<EventHandler>>();
   private wildcards: Array<{ pattern: string; handler: EventHandler }> = [];
 
+  // Event subscription with method chaining
   on<T = any>(event: EventPattern, handler: EventHandler<T>): this {
     if (event.includes("*")) {
       this.wildcards.push({ pattern: event, handler });
@@ -14,6 +19,8 @@ class EventEmitter {
     }
     return this;
   }
+
+  // One-time event subscription
   once<T = any>(event: EventPattern, handler: EventHandler<T>): this {
     const wrapper = (e?: string, d?: T) => {
       handler(e, d);
@@ -22,6 +29,7 @@ class EventEmitter {
     return this.on(event, wrapper);
   }
 
+  // Event unsubscription
   off(event: EventPattern, handler: EventHandler): this {
     const handlers = this.listeners.get(event);
     if (handlers) handlers.delete(handler);
@@ -29,50 +37,44 @@ class EventEmitter {
     return this;
   }
 
+  // Event emission with hierarchical routing
   emit<T = any>(event: EventPattern, data?: T): void {
+    // Direct listeners
     const handlers = this.listeners.get(event);
     if (handlers)
       handlers.forEach((h) => {
         try {
           h(event, data);
-        } catch (e) {}
+        } catch (e) {
+          console.error(`Event error: ${event}`, e);
+        }
       });
 
+    // Wildcard pattern matching
     this.wildcards.forEach(({ pattern, handler }) => {
       if (this.matchPattern(event, pattern)) {
         try {
           handler(event, data);
-        } catch (e) {}
+        } catch (e) {
+          console.error(`Wildcard error: ${pattern}`, e);
+        }
       }
     });
   }
 
+  // Pattern matching for wildcards
   private matchPattern(event: string, pattern: string): boolean {
     const eParts = event.split(":");
     const pParts = pattern.split(":");
-
-    const hasDoubleWildcard = pParts[pParts.length - 1] === "**";
-
-    if (hasDoubleWildcard) {
-      const basePattern = pParts.slice(0, -1).join(":");
-      const eventBase = eParts.slice(0, pParts.length - 1).join(":");
-      return basePattern === eventBase;
-    }
-
-    if (eParts.length > pParts.length && pParts[pParts.length - 1] === "*") {
-      const basePattern = pParts.slice(0, -1);
-      const eventBase = eParts.slice(0, basePattern.length);
-      return basePattern.every((part, i) => part === eventBase[i]);
-    }
-
     if (eParts.length !== pParts.length) return false;
     return pParts.every((part, i) => part === "*" || part === eParts[i]);
   }
 }
 
+// Packet types and interfaces
 interface TWPacket {
-  m?: string;
-  p?: any[];
+  m?: string; // method type
+  p?: any[]; // parameters [session_id, ...data]
 }
 
 interface SocketSession {
@@ -87,8 +89,10 @@ interface SocketSession {
   via: string;
 }
 
+// Session types
 type SessionType = "chart" | "quote" | "replay" | "study";
 
+// Base session class
 abstract class BaseSession extends EventEmitter {
   abstract readonly sessionType: SessionType;
   abstract readonly id: string;
@@ -99,6 +103,7 @@ abstract class BaseSession extends EventEmitter {
 
   abstract handlePacket(packet: TWPacket): void;
 
+  // Method chaining for event handlers
   onData<T = any>(handler: EventHandler<T>): this {
     return this.on("data", handler);
   }
@@ -109,13 +114,13 @@ abstract class BaseSession extends EventEmitter {
 }
 
 type ErrorHandler = EventHandler<string | Error>;
+
+// Chart session implementation
 class ChartSession extends BaseSession {
   readonly sessionType = "chart" as const;
   readonly id: string;
   private periods = new Map<number, any>();
   private infos: any = {};
-  private studies = new Map<string, StudySession>();
-  private replaySession?: ReplaySession;
 
   constructor(client: TVWSClient) {
     super(client);
@@ -141,10 +146,6 @@ class ChartSession extends BaseSession {
       case "symbol_resolved":
         this.infos = { series_id: data?.[1], ...data?.[2] };
         this.emit("symbolLoaded", this.infos);
-        break;
-      case "series_loaded":
-        this.infos = { ...this.infos, series_data: data?.[1] };
-        this.emit("seriesLoaded", this.infos);
         break;
       case "timescale_update":
       case "du":
@@ -178,13 +179,6 @@ class ChartSession extends BaseSession {
         });
       });
     }
-
-    // Handle study updates
-    this.studies.forEach((_, studyId) => {
-      if (updateData?.[studyId]) {
-        changes.push(`study:${studyId}`);
-      }
-    });
 
     return changes;
   }
@@ -223,244 +217,17 @@ class ChartSession extends BaseSession {
     return this.infos;
   }
 
-  // Study management methods
-  attachStudy(studyConfig: any): StudySession {
-    const study = new StudySession(this.client, this.id, studyConfig);
-    this.studies.set(study.studyId, study);
-    return study;
-  }
-
-  removeStudy(studyId: string): this {
-    const study = this.studies.get(studyId);
-    if (study) {
-      study.delete();
-      this.studies.delete(studyId);
-    }
-    return this;
-  }
-
-  getStudies(): StudySession[] {
-    return Array.from(this.studies.values());
-  }
-
-  // Replay management methods
-  createReplay(): ReplaySession {
-    if (!this.replaySession) {
-      this.replaySession = new ReplaySession(this.client);
-      // Forward replay events to chart session
-      this.replaySession.on("replayLoaded", (data) =>
-        this.emit("replayLoaded", data),
-      );
-      this.replaySession.on("replayPoint", (point) =>
-        this.emit("replayPoint", point),
-      );
-      this.replaySession.on("replayResolution", (data) =>
-        this.emit("replayResolution", data),
-      );
-      this.replaySession.on("replayEnd", () => this.emit("replayEnd"));
-    }
-    return this.replaySession;
-  }
-
   delete(): void {
-    // Clean up studies
-    this.studies.forEach((study) => study.delete());
-    this.studies.clear();
-
-    // Clean up replay session
-    if (this.replaySession) {
-      this.replaySession.delete();
-      this.replaySession = undefined;
-    }
-
     this.client.send("chart_delete_session", [this.id]);
     this.client.unregisterSession(this.id);
   }
 }
 
-// Replay session implementation
-class ReplaySession extends BaseSession {
-  readonly sessionType = "replay" as const;
-  readonly id: string;
-  private instanceId?: string;
-  private currentPosition?: number;
-  private playbackSpeed = 1;
-  private replayOKCallbacks = new Map<number, () => void>();
-  private commandId = 0;
-
-  constructor(client: TVWSClient) {
-    super(client);
-    this.id = `rs_${Math.random().toString(36).substr(2, 9)}`;
-    client.registerSession(this);
-    this.init();
-  }
-
-  private init(): void {
-    // Replay sessions are created through chart sessions
-    this.client.on(`replay:${this.id}:*`, (event, packet) => {
-      const eventType = event?.split(":")[2];
-      if (eventType && packet) this.handlePacket({ m: eventType, p: packet });
-    });
-  }
-
-  handlePacket(packet: TWPacket): void {
-    const type = packet.m;
-    const data = packet.p;
-
-    switch (type) {
-      case "replay_ok":
-        if (data?.[1] && this.replayOKCallbacks.has(data[1])) {
-          this.replayOKCallbacks.get(data[1])!();
-          this.replayOKCallbacks.delete(data[1]);
-        }
-        break;
-      case "replay_instance_id":
-        this.instanceId = data?.[1];
-        this.emit("replayLoaded", this.instanceId);
-        break;
-      case "replay_point":
-        this.currentPosition = data?.[1];
-        this.emit("replayPoint", this.currentPosition);
-        break;
-      case "replay_resolutions":
-        this.emit("replayResolution", { data1: data?.[1], data2: data?.[2] });
-        break;
-      case "replay_data_end":
-        this.emit("replayEnd");
-        break;
-      case "critical_error":
-        this.emit("error", `Replay error: ${data?.[1]} - ${data?.[2]}`);
-        break;
-    }
-  }
-
-  // Replay control methods
-  replayGo(point: number): this {
-    const commandId = this.commandId++;
-    this.replayOKCallbacks.set(commandId, () => {});
-    this.client.send("replay_go", [this.id, commandId, point]);
-    return this;
-  }
-
-  replaySpeed(speed: number): this {
-    const commandId = this.commandId++;
-    this.replayOKCallbacks.set(commandId, () => {
-      this.playbackSpeed = speed;
-    });
-    this.client.send("replay_speed", [this.id, commandId, speed]);
-    return this;
-  }
-
-  replayPosition(): number | undefined {
-    return this.currentPosition;
-  }
-
-  replayStatus(): { instanceId?: string; position?: number; speed: number } {
-    return {
-      instanceId: this.instanceId,
-      position: this.currentPosition,
-      speed: this.playbackSpeed,
-    };
-  }
-
-  delete(): void {
-    this.client.send("replay_cancel_session", [this.id]);
-    this.client.unregisterSession(this.id);
-  }
-}
-
-// Study session implementation
-class StudySession extends BaseSession {
-  readonly sessionType = "study" as const;
-  readonly id: string;
-  readonly studyId: string;
-  private periods = new Map<number, any>();
-  private instance?: any;
-
-  constructor(client: TVWSClient, chartId: string, studyConfig: any) {
-    super(client);
-    this.id = `ss_${Math.random().toString(36).substr(2, 9)}`;
-    this.studyId = `study_${Math.random().toString(36).substr(2, 9)}`;
-    client.registerSession(this);
-    this.init(chartId, studyConfig);
-  }
-
-  private init(chartId: string, studyConfig: any): void {
-    // Study sessions are attached to chart sessions
-    this.client.on(`study:${this.id}:*`, (event, packet) => {
-      const eventType = event?.split(":")[2];
-      if (eventType && packet) this.handlePacket({ m: eventType, p: packet });
-    });
-
-    // Create the study
-    this.client.send("create_study", [
-      chartId,
-      this.studyId,
-      JSON.stringify(studyConfig),
-    ]);
-  }
-
-  handlePacket(packet: TWPacket): void {
-    const type = packet.m;
-    const data = packet.p;
-
-    switch (type) {
-      case "study_completed":
-        this.instance = data?.[1];
-        this.emit("studyCompleted", this.instance);
-        break;
-      case "timescale_update":
-      case "du":
-        this.processStudyUpdate(data?.[1]);
-        this.emit("update", "plots");
-        break;
-      case "critical_error":
-        this.emit("error", `Study error: ${data?.[1]} - ${data?.[2]}`);
-        break;
-    }
-  }
-
-  private processStudyUpdate(updateData: any): void {
-    const studyData = updateData?.[this.studyId];
-    if (!studyData || !studyData.st) return;
-
-    studyData.st.forEach((p: any) => {
-      const period: any = {};
-
-      p.v.forEach((plot: any, i: number) => {
-        if (!this.instance?.plots) {
-          period[i === 0 ? "$time" : `plot_${i - 1}`] = plot;
-          return;
-        }
-        const plotName =
-          i === 0 ? "$time" : this.instance.plots[`plot_${i - 1}`];
-        if (plotName && !period[plotName]) {
-          period[plotName] = plot;
-        } else {
-          period[`plot_${i - 1}`] = plot;
-        }
-      });
-
-      this.periods.set(p.v[0], period);
-    });
-  }
-
-  getStudyData(): any[] {
-    return Array.from(this.periods.values()).sort(
-      (a, b) => (b.$time || 0) - (a.$time || 0),
-    );
-  }
-
-  delete(): void {
-    this.client.send("remove_study", [this.studyId]);
-    this.client.unregisterSession(this.id);
-  }
-}
-
+// Quote session implementation
 class QuoteSession extends BaseSession {
   readonly sessionType = "quote" as const;
   readonly id: string;
-  private symbols = new Map<string, { status: string; data?: any }>();
+  private symbols = new Set<string>();
 
   constructor(client: TVWSClient) {
     super(client);
@@ -483,35 +250,11 @@ class QuoteSession extends BaseSession {
 
     switch (type) {
       case "quote_completed":
-        const symbolKey = data?.[1];
-        if (symbolKey) {
-          const symbol = this.symbols.get(symbolKey);
-          if (symbol) {
-            symbol.status = "completed";
-            this.emit("quote_completed", symbolKey);
-          }
-        }
+        this.emit("loaded", data?.[1]);
         break;
       case "qsd":
-        if (data?.[1]) {
-          const symbolKey = data[1].n;
-          const symbolData = data[1];
-
-          if (this.symbols.has(symbolKey)) {
-            // Update existing symbol
-            this.symbols.get(symbolKey)!.data = {
-              ...this.symbols.get(symbolKey)!.data,
-              ...symbolData.v,
-            };
-          } else if (symbolData.s === "ok") {
-            // Auto-add symbol if not tracked
-            this.symbols.set(symbolKey, {
-              status: "active",
-              data: symbolData.v,
-            });
-          }
-
-          this.emit("data", { symbol: symbolKey, data: symbolData.v });
+        if (data?.[1]?.s === "ok") {
+          this.emit("data", data[1].v);
         }
         break;
       case "critical_error":
@@ -521,7 +264,7 @@ class QuoteSession extends BaseSession {
   }
 
   addSymbol(symbol: string): this {
-    this.symbols.set(symbol, { status: "loading" });
+    this.symbols.add(symbol);
     this.client.send("quote_add_symbols", [this.id, symbol]);
     return this;
   }
@@ -529,24 +272,6 @@ class QuoteSession extends BaseSession {
   removeSymbol(symbol: string): this {
     this.symbols.delete(symbol);
     this.client.send("quote_remove_symbols", [this.id, symbol]);
-    return this;
-  }
-
-  // Enhanced methods for better symbol management
-  getQuoteStatus(symbol: string): { status: string; data?: any } | undefined {
-    return this.symbols.get(symbol);
-  }
-
-  getAllSymbols(): string[] {
-    return Array.from(this.symbols.keys());
-  }
-
-  getSymbolData(symbol: string): any {
-    return this.symbols.get(symbol)?.data;
-  }
-
-  setFields(fields: string[]): this {
-    this.client.send("quote_set_fields", [this.id, fields]);
     return this;
   }
 
@@ -562,6 +287,7 @@ class TVWSClient extends EventEmitter {
   private sessions = new Map<string, BaseSession>();
   private sendQueue: string[] = [];
   private logged = false;
+  private sessionCallbacks = new Map<SessionType, Set<EventHandler>>();
 
   constructor(private options: any = {}) {
     super();
@@ -627,10 +353,8 @@ class TVWSClient extends EventEmitter {
         const session = this.sessions.get(sessionId);
 
         if (session) {
-          // Route to appropriate session with hierarchical event namespacing
           const event = `${session.sessionType}:${sessionId}:${packet.m}`;
           this.emit(event, packet.p);
-          session.handlePacket(packet);
         } else if (!this.logged) {
           this.emit("client:logged", packet);
         } else {
@@ -684,7 +408,7 @@ class TVWSClient extends EventEmitter {
     this.sessions.delete(sessionId);
   }
 
-  // Session factory
+  // Session factory with method chaining
   createChart(): ChartSession {
     return new ChartSession(this);
   }
@@ -693,15 +417,7 @@ class TVWSClient extends EventEmitter {
     return new QuoteSession(this);
   }
 
-  createReplay(): ReplaySession {
-    return new ReplaySession(this);
-  }
-
-  createStudy(chartId: string, studyConfig: any): StudySession {
-    return new StudySession(this, chartId, studyConfig);
-  }
-
-  // Convenience methods
+  // Convenience methods with chaining
   onConnected(handler: EventHandler): this {
     return this.on("client:connected", handler);
   }
@@ -712,14 +428,6 @@ class TVWSClient extends EventEmitter {
 
   onError(handler: ErrorHandler): this {
     return this.on("client:error", handler);
-  }
-
-  onPing(handler: EventHandler<number>): this {
-    return this.on("client:ping", handler);
-  }
-
-  onDisconnected(handler: EventHandler): this {
-    return this.on("client:disconnected", handler);
   }
 
   close(): Promise<void> {
@@ -741,20 +449,13 @@ export function createClient(options?: any): TVWSClient {
   return new TVWSClient(options);
 }
 
-// Convenience export
+// Convenience export for direct usage
 export function connect(options?: any): TVWSClient {
   return createClient(options);
 }
 
 // Export classes for extensibility
-export {
-  EventEmitter,
-  TVWSClient,
-  ChartSession,
-  QuoteSession,
-  ReplaySession,
-  StudySession,
-};
+export { EventEmitter, TVWSClient, ChartSession, QuoteSession };
 
 // Type exports
 export type {
@@ -765,9 +466,11 @@ export type {
   TWPacket,
 };
 
-// Global browser exposure
+// Global browser exposure (will be handled by build script)
 declare global {
   interface Window {
     tvws?: { createClient: typeof createClient; connect: typeof connect };
   }
 }
+
+export default { createClient, connect };

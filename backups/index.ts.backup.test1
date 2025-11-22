@@ -1,0 +1,793 @@
+import WebSocket from "ws";
+
+// ===== TYPE DEFINITIONS =====
+
+type PacketType = string;
+type PacketData = any[];
+type SessionId = string;
+type EventName = string;
+type HandlerFunction = (...args: any[]) => void;
+
+interface TWPacket {
+  m?: PacketType; // packet type
+  p?: PacketData; // packet data
+}
+
+interface SocketSession {
+  session_id: string;
+  timestamp: number;
+  timestampMs: number;
+  release: string;
+  studies_metadata_hash: string;
+  protocol: "json" | string;
+  javastudies: string;
+  auth_scheme_vsn: number;
+  via: string;
+}
+
+interface PricePeriod {
+  time: number;
+  open: number;
+  close: number;
+  max: number;
+  min: number;
+  volume: number;
+}
+
+interface SymbolInfo {
+  series_id: string;
+  pro_name?: string;
+  short_name?: string;
+  [key: string]: any;
+}
+
+interface MarketData {
+  [key: string]: any;
+}
+
+// ===== EVENT EMITTER BASE CLASS =====
+
+class EventEmitter {
+  private listeners = new Map<EventName, HandlerFunction[]>();
+  private wildcardListeners: Array<{
+    pattern: string;
+    handler: HandlerFunction;
+  }> = [];
+
+  /**
+   * Subscribe to an event with optional namespace filtering
+   * @param event - Event name (supports wildcards like "chart:*:update")
+   * @param handler - Event handler
+   * @returns this for method chaining
+   */
+  on(event: string, handler: HandlerFunction): this {
+    if (event.includes("*")) {
+      this.wildcardListeners.push({ pattern: event, handler });
+    } else {
+      if (!this.listeners.has(event)) {
+        this.listeners.set(event, []);
+      }
+      this.listeners.get(event)!.push(handler);
+    }
+    return this;
+  }
+
+  /**
+   * Subscribe once to an event
+   * @param event - Event name
+   * @param handler - Event handler
+   * @returns this for method chaining
+   */
+  once(event: string, handler: HandlerFunction): this {
+    const wrapper = (...args: any[]) => {
+      handler(...args);
+      this.off(event, wrapper);
+    };
+    return this.on(event, wrapper);
+  }
+
+  /**
+   * Unsubscribe from an event
+   * @param event - Event name
+   * @param handler - Event handler to remove
+   * @returns this for method chaining
+   */
+  off(event: string, handler: HandlerFunction): this {
+    if (this.listeners.has(event)) {
+      const handlers = this.listeners.get(event)!;
+      const index = handlers.indexOf(handler);
+      if (index > -1) {
+        handlers.splice(index, 1);
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Emit an event with data
+   * @param event - Event name
+   * @param args - Event arguments
+   */
+  emit(event: string, ...args: any[]): void {
+    // Direct listeners
+    if (this.listeners.has(event)) {
+      this.listeners.get(event)!.forEach((handler) => {
+        try {
+          handler(...args);
+        } catch (err) {
+          console.error(`Error in event handler for "${event}":`, err);
+        }
+      });
+    }
+
+    // Wildcard listeners
+    this.wildcardListeners.forEach(({ pattern, handler }) => {
+      if (this.matchPattern(event, pattern)) {
+        try {
+          handler(event, ...args);
+        } catch (err) {
+          console.error(`Error in wildcard handler for "${pattern}":`, err);
+        }
+      }
+    });
+  }
+
+  private matchPattern(event: string, pattern: string): boolean {
+    const eventParts = event.split(":");
+    const patternParts = pattern.split(":");
+
+    if (eventParts.length !== patternParts.length) return false;
+
+    return patternParts.every(
+      (part, i) => part === "*" || part === eventParts[i],
+    );
+  }
+}
+
+// ===== WEBSOCKET PROTOCOL HANDLER =====
+
+class ProtocolHandler {
+  static parseWSPacket(str: string): TWPacket[] {
+    return str
+      .replace(/~h~/g, "")
+      .split(/~m~\d+~m~/)
+      .map((p) => {
+        if (!p) return null;
+        try {
+          return JSON.parse(p);
+        } catch (error) {
+          console.warn("Cannot parse packet:", p);
+          return null;
+        }
+      })
+      .filter((p): p is TWPacket => p !== null);
+  }
+
+  static formatWSPacket(packet: string | TWPacket): string {
+    const msg = typeof packet === "object" ? JSON.stringify(packet) : packet;
+    return `~m~${msg.length}~m~${msg}`;
+  }
+}
+
+// ===== MAIN WEBSOCKET CLIENT =====
+
+interface ClientOptions {
+  token?: string;
+  signature?: string;
+  server?: string;
+  debug?: boolean;
+}
+
+class TradingViewClient extends EventEmitter {
+  private ws: WebSocket | null = null;
+  private sessions = new Map<SessionId, { type: string }>();
+  private sendQueue: string[] = [];
+  private logged = false;
+  private options: ClientOptions;
+
+  constructor(options: ClientOptions = {}) {
+    super();
+    this.options = { debug: false, ...options };
+    this.connect();
+  }
+
+  private connect(): void {
+    const server = this.options.server || "data";
+    const url = `wss://${server}.tradingview.com/socket.io/websocket?type=chart`;
+
+    this.ws = new WebSocket(url, {
+      origin: "https://www.tradingview.com",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    this.setupWebSocketHandlers();
+  }
+
+  private setupWebSocketHandlers(): void {
+    if (!this.ws) return;
+
+    this.ws.on("open", () => {
+      this.emit("client:connected");
+      this.authenticate();
+    });
+
+    this.ws.on("close", () => {
+      this.logged = false;
+      this.emit("client:disconnected");
+    });
+
+    this.ws.on("error", (err) => {
+      this.emit("client:error", err.message);
+    });
+
+    this.ws.on("message", (data) => {
+      this.handleMessage(data.toString());
+    });
+  }
+
+  private async authenticate(): Promise<void> {
+    if (this.options.token) {
+      try {
+        // For demonstration, using mock auth - in real implementation you'd validate token
+        this.send("set_auth_token", [this.options.token]);
+      } catch (err) {
+        this.emit("client:error", `Authentication failed: ${err}`);
+        return;
+      }
+    } else {
+      this.send("set_auth_token", ["unauthorized_user_token"]);
+    }
+
+    this.logged = true;
+    this.emit("client:logged");
+    this.flushQueue();
+  }
+
+  private handleMessage(rawData: string): void {
+    const packets = ProtocolHandler.parseWSPacket(rawData);
+
+    packets.forEach((packet) => {
+      if (this.options.debug) {
+        console.log("PACKET:", packet);
+      }
+
+      // Handle ping
+      if (typeof packet === "number") {
+        this.sendRaw(`~h~${packet}`);
+        this.emit("client:ping", packet);
+        return;
+      }
+
+      // Handle protocol error
+      if (packet.m === "protocol_error") {
+        this.emit("client:error", "Protocol error:", packet.p);
+        this.ws?.close();
+        return;
+      }
+
+      // Handle normal packets
+      if (packet.m && packet.p) {
+        const sessionId = packet.p[0] as SessionId;
+        const session = this.sessions.get(sessionId);
+
+        if (session) {
+          // Emit namespaced event: {sessionType}:{sessionId}:{packetType}
+          const eventName = `${session.type}:${sessionId}:${packet.m}`;
+          this.emit(eventName, packet.p);
+        } else {
+          // Unhandled packet
+          this.emit("client:data", packet);
+        }
+
+        return;
+      }
+
+      // Handle login response
+      if (!this.logged) {
+        this.emit("client:logged", packet);
+        return;
+      }
+
+      // Default data event
+      this.emit("client:data", packet);
+    });
+  }
+
+  private send(type: string, params: any[] = []): void {
+    const packet = { m: type, p: params };
+    this.sendQueue.push(ProtocolHandler.formatWSPacket(packet));
+    this.flushQueue();
+  }
+
+  private sendRaw(packet: string): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(packet);
+    }
+  }
+
+  private flushQueue(): void {
+    while (
+      this.ws?.readyState === WebSocket.OPEN &&
+      this.logged &&
+      this.sendQueue.length > 0
+    ) {
+      this.ws.send(this.sendQueue.shift()!);
+    }
+  }
+
+  /**
+   * Register a session with the client
+   */
+  registerSession(sessionId: SessionId, type: string): void {
+    this.sessions.set(sessionId, { type });
+  }
+
+  /**
+   * Unregister a session
+   */
+  unregisterSession(sessionId: SessionId): void {
+    this.sessions.delete(sessionId);
+  }
+
+  /**
+   * Send a packet to TradingView
+   */
+  sendPacket(type: string, params: any[] = []): void {
+    this.send(type, params);
+  }
+
+  /**
+   * Close the WebSocket connection
+   */
+  async close(): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.close();
+      }
+      resolve();
+    });
+  }
+
+  get isOpen(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN ?? false;
+  }
+
+  get isLogged(): boolean {
+    return this.logged;
+  }
+}
+
+// ===== CHART SESSION =====
+
+interface ChartOptions {
+  timeframe?: string;
+  range?: number;
+  extendedHours?: boolean;
+}
+
+class ChartSession extends EventEmitter {
+  private client: TradingViewClient;
+  private sessionId: SessionId;
+  private periods = new Map<number, PricePeriod>();
+  private infos: SymbolInfo = {};
+  private studyListeners = new Map<string, HandlerFunction>();
+
+  constructor(client: TradingViewClient) {
+    super();
+    this.client = client;
+    this.sessionId = this.generateId("cs");
+
+    // Register with client
+    this.client.registerSession(this.sessionId, "chart");
+
+    // Subscribe to all chart events for this session
+    this.client.on(
+      `chart:${this.sessionId}:*`,
+      (event: string, ...args: any[]) => {
+        this.handlePacket(event.split(":")[2], args);
+      },
+    );
+
+    // Initialize session
+    this.client.sendPacket("chart_create_session", [this.sessionId, ""]);
+  }
+
+  private generateId(prefix: string): SessionId {
+    return `${prefix}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private handlePacket(type: string, data: any[]): void {
+    switch (type) {
+      case "symbol_resolved":
+        this.infos = { series_id: data[1], ...data[2] };
+        this.emit("symbolLoaded", this.infos);
+        break;
+
+      case "timescale_update":
+      case "du":
+        const changes = this.processUpdate(data[1]);
+        this.emit("update", changes);
+        break;
+
+      case "symbol_error":
+        this.emit("error", `Symbol error: ${data[2]}`);
+        break;
+
+      case "series_error":
+        this.emit("error", `Series error: ${data[3]}`);
+        break;
+
+      case "critical_error":
+        const [, name, description] = data;
+        this.emit("error", "Critical error:", name, description);
+        break;
+
+      default:
+        // Handle study packets
+        if (typeof data[1] === "string" && this.studyListeners.has(data[1])) {
+          this.studyListeners.get(data[1])!(data);
+        }
+    }
+  }
+
+  private processUpdate(updateData: any): string[] {
+    const changes: string[] = [];
+
+    Object.keys(updateData).forEach((key) => {
+      changes.push(key);
+
+      if (key === "$prices" && updateData.$prices?.s) {
+        updateData.$prices.s.forEach((p: any) => {
+          this.periods.set(p.v[0], {
+            time: p.v[0],
+            open: p.v[1],
+            close: p.v[4],
+            max: p.v[2],
+            min: p.v[3],
+            volume: Math.round(p.v[5] * 100) / 100,
+          });
+        });
+      }
+
+      // Handle study updates
+      if (this.studyListeners.has(key)) {
+        this.studyListeners.get(key)!(updateData[key]);
+      }
+    });
+
+    return changes;
+  }
+
+  /**
+   * Set market symbol
+   * @param symbol - Market symbol (e.g., 'BINANCE:BTCUSDT')
+   * @returns this for method chaining
+   */
+  setMarket(symbol: string): this {
+    const symbolData = {
+      symbol,
+      adjustment: "splits",
+      session: this.options.extendedHours ? "extended" : "regular",
+    };
+
+    this.client.sendPacket("resolve_symbol", [
+      this.sessionId,
+      "symbol_1",
+      `=${JSON.stringify(symbolData)}`,
+    ]);
+
+    return this;
+  }
+
+  /**
+   * Set chart timeframe and range
+   * @param timeframe - Timeframe (e.g., '1', '5', '15', '60', '1D', '1W', '1M')
+   * @param range - Number of periods to load
+   * @returns this for method chaining
+   */
+  setSeries(timeframe: string = "1D", range: number = 300): this {
+    this.periods.clear();
+
+    this.client.sendPacket("create_series", [
+      this.sessionId,
+      "$prices",
+      "s1",
+      "symbol_1",
+      timeframe,
+      range,
+      "",
+    ]);
+
+    return this;
+  }
+
+  /**
+   * Add a study/indicator
+   * @param studyId - Study identifier
+   * @returns this for method chaining
+   */
+  addStudy(studyId: string): this {
+    this.client.sendPacket("create_study", [
+      this.sessionId,
+      studyId,
+      "st1",
+      "s1",
+      [],
+    ]);
+
+    return this;
+  }
+
+  /**
+   * Listen for study data
+   * @param studyId - Study identifier
+   * @param handler - Data handler function
+   * @returns this for method chaining
+   */
+  onStudyData(studyId: string, handler: HandlerFunction): this {
+    this.studyListeners.set(studyId, handler);
+    return this;
+  }
+
+  get periods(): PricePeriod[] {
+    return Array.from(this.periods.values()).sort((a, b) => b.time - a.time);
+  }
+
+  get infos(): SymbolInfo {
+    return this.infos;
+  }
+
+  get options(): ChartOptions {
+    return {}; // Return stored options if implemented
+  }
+
+  /**
+   * Delete the chart session
+   */
+  delete(): void {
+    this.client.sendPacket("chart_delete_session", [this.sessionId]);
+    this.client.unregisterSession(this.sessionId);
+  }
+}
+
+// ===== QUOTE SESSION =====
+
+class QuoteSession extends EventEmitter {
+  private client: TradingViewClient;
+  private sessionId: SessionId;
+  private symbolListeners = new Map<string, HandlerFunction[]>();
+
+  constructor(client: TradingViewClient) {
+    super();
+    this.client = client;
+    this.sessionId = this.generateId("qs");
+
+    // Register with client
+    this.client.registerSession(this.sessionId, "quote");
+
+    // Subscribe to quote events
+    this.client.on(
+      `quote:${this.sessionId}:*`,
+      (event: string, ...args: any[]) => {
+        this.handlePacket(event.split(":")[2], args);
+      },
+    );
+
+    // Initialize session
+    this.client.sendPacket("quote_create_session", [this.sessionId]);
+  }
+
+  private generateId(prefix: string): SessionId {
+    return `${prefix}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private handlePacket(type: string, data: any[]): void {
+    switch (type) {
+      case "quote_completed":
+        const symbolKey = data[1];
+        if (this.symbolListeners.has(symbolKey)) {
+          this.symbolListeners.get(symbolKey)!.forEach((h) => h(data));
+        }
+        break;
+
+      case "qsd":
+        const qsdSymbolKey = data[1].n;
+        if (this.symbolListeners.has(qsdSymbolKey)) {
+          this.symbolListeners.get(qsdSymbolKey)!.forEach((h) => h(data));
+        }
+        break;
+    }
+  }
+
+  /**
+   * Add symbols to quote session
+   * @param symbols - Array of symbol names
+   * @returns this for method chaining
+   */
+  addSymbols(symbols: string[]): this {
+    symbols.forEach((symbol) => {
+      this.client.sendPacket("quote_add_symbols", [this.sessionId, symbol]);
+    });
+    return this;
+  }
+
+  /**
+   * Listen for quote data for specific symbol
+   * @param symbol - Symbol name
+   * @param handler - Data handler function
+   * @returns this for method chaining
+   */
+  onSymbol(symbol: string, handler: HandlerFunction): this {
+    if (!this.symbolListeners.has(symbol)) {
+      this.symbolListeners.set(symbol, []);
+    }
+    this.symbolListeners.get(symbol)!.push(handler);
+    return this;
+  }
+
+  /**
+   * Remove symbols from quote session
+   * @param symbols - Array of symbol names
+   * @returns this for method chaining
+   */
+  removeSymbols(symbols: string[]): this {
+    symbols.forEach((symbol) => {
+      this.client.sendPacket("quote_remove_symbols", [this.sessionId, symbol]);
+    });
+    return this;
+  }
+
+  /**
+   * Delete the quote session
+   */
+  delete(): void {
+    this.client.sendPacket("quote_delete_session", [this.sessionId]);
+    this.client.unregisterSession(this.sessionId);
+  }
+}
+
+// ===== REPLAY SESSION =====
+
+class ReplaySession extends EventEmitter {
+  private client: TradingViewClient;
+  private sessionId: SessionId;
+  private replaySessionId: SessionId;
+  private replayCallbacks = new Map<string, () => void>();
+
+  constructor(client: TradingViewClient) {
+    super();
+    this.client = client;
+    this.sessionId = this.generateId("rs");
+    this.replaySessionId = this.generateId("replay");
+
+    // Register sessions
+    this.client.registerSession(this.sessionId, "chart");
+    this.client.registerSession(this.replaySessionId, "replay");
+
+    // Subscribe to replay events
+    this.client.on(
+      `replay:${this.replaySessionId}:*`,
+      (event: string, ...args: any[]) => {
+        this.handleReplayPacket(event.split(":")[2], args);
+      },
+    );
+
+    // Initialize sessions
+    this.client.sendPacket("chart_create_session", [this.sessionId, ""]);
+    this.client.sendPacket("replay_create_session", [this.replaySessionId]);
+  }
+
+  private generateId(prefix: string): SessionId {
+    return `${prefix}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private handleReplayPacket(type: string, data: any[]): void {
+    switch (type) {
+      case "replay_ok":
+        const commandId = data[1];
+        if (this.replayCallbacks.has(commandId)) {
+          this.replayCallbacks.get(commandId)!();
+          this.replayCallbacks.delete(commandId);
+        }
+        break;
+
+      case "replay_instance_id":
+        this.emit("replayLoaded", data[1]);
+        break;
+
+      case "replay_point":
+        this.emit("replayPoint", data[1]);
+        break;
+
+      case "replay_resolutions":
+        this.emit("replayResolution", data[1], data[2]);
+        break;
+
+      case "replay_data_end":
+        this.emit("replayEnd");
+        break;
+
+      case "critical_error":
+        const [, name, description] = data;
+        this.emit("error", "Critical error:", name, description);
+        break;
+    }
+  }
+
+  /**
+   * Load replay data
+   * @param symbol - Symbol to replay
+   * @param timeframe - Chart timeframe
+   * @returns this for method chaining
+   */
+  loadReplay(symbol: string, timeframe: string): this {
+    this.client.sendPacket("replay_load", [
+      this.replaySessionId,
+      this.sessionId,
+      symbol,
+      timeframe,
+    ]);
+
+    return this;
+  }
+
+  /**
+   * Start replay
+   * @param speed - Playback speed
+   * @returns this for method chaining
+   */
+  startReplay(speed: number = 1): this {
+    this.client.sendPacket("replay_start", [this.replaySessionId, speed]);
+    return this;
+  }
+
+  /**
+   * Pause replay
+   * @returns this for method chaining
+   */
+  pauseReplay(): this {
+    this.client.sendPacket("replay_pause", [this.replaySessionId]);
+    return this;
+  }
+
+  /**
+   * Stop replay
+   * @returns this for method chaining
+   */
+  stopReplay(): this {
+    this.client.sendPacket("replay_stop", [this.replaySessionId]);
+    return this;
+  }
+
+  /**
+   * Delete replay session
+   */
+  delete(): void {
+    this.client.sendPacket("replay_delete_session", [this.replaySessionId]);
+    this.client.sendPacket("chart_delete_session", [this.sessionId]);
+    this.client.unregisterSession(this.sessionId);
+    this.client.unregisterSession(this.replaySessionId);
+  }
+}
+
+// ===== MAIN EXPORT =====
+
+export {
+  TradingViewClient,
+  ChartSession,
+  QuoteSession,
+  ReplaySession,
+  type ClientOptions,
+  type ChartOptions,
+  type PricePeriod,
+  type SymbolInfo,
+  type MarketData,
+  type SocketSession,
+  type TWPacket,
+};
+
+// Default export for convenience
+export default TradingViewClient;

@@ -1,33 +1,11 @@
 {
   "name": "tvws",
   "version": "0.0.12",
-  "module": "ESNext",
+  "type": "module",
   "description": "Browser-compatible TradingView WebSocket API with extensible event system",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/badsector666/tvws.git"
-  },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "browser": "dist/index.js",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "browser": "./dist/index.umd.js"
-    }
-  },
-  "files": [
-    "dist/"
-  ],
-  "scripts": {
-    "build": "bun run build.js",
-    "build:types": "bunx tsc --emitDeclarationOnly",
-    "typecheck": "bunx tsc --noEmit",
-    "dev": "bun run build",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "bun run typecheck && bun run build"
   },
   "author": "badsector666 <badsectorkiller666@gmail.com>",
   "license": "MIT",
@@ -46,6 +24,35 @@
     "api",
     "extensible"
   ],
+  "main": "./dist/tvws.cjs",
+  "module": "./dist/tvws.esm.js",
+  "browser": "./dist/tvws.browser.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "browser": "./dist/tvws.browser.js",
+      "import": "./dist/tvws.esm.js",
+      "require": "./dist/tvws.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bun run build:browser && bun run build:esm && bun run build:node && bun run build:types",
+    "build:browser": "bun build src/index.ts --outfile dist/tvws.browser.js --target browser --minify",
+    "build:prod": "bun build src/index.ts --outfile dist/tvws.min.js --target browser --minify",
+    "build:esm": "bun build src/index.ts --outfile dist/tvws.esm.js --target browser --format esm --minify",
+    "build:node": "bun build src/index.ts --outfile dist/tvws.cjs --target node --format cjs",
+    "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist",
+    "dev": "bun --watch src/index.ts",
+    "clean": "rm -rf dist",
+    "size": "du -h dist/*.js && ls -la dist/*.js",
+    "prepublishOnly": "bun run clean && bun run build",
+    "verify": "node scripts/verify-build.js",
+    "examples": "echo 'Run examples:' && echo '  Basic Node.js: node examples/basic-usage.cjs' && echo '  Advanced: node examples/advanced-usage.cjs' && echo '  Trading Dashboard: node examples/trading-dashboard.cjs' && echo '  Browser (Bun): cd examples && bun run bun-simple.html' && echo '  Browser (ESM): cd examples && bun run bun-test.html'"
+  },
   "devDependencies": {
     "typescript": "^5.9.3"
   },
